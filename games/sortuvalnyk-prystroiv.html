@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; connect-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>Сортувальник пристроїв комп’ютера</title>
+<style>
+:root{--bg:#EAF6FF;--card:#FFFFFF;--ink:#1F2A5C;--muted:#4F5A8A;--line:#1F2A5C;--good:#1FB35A;--bad:#E5484D;--sun:#FFC93C;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141A3A;--card:#232C63;--ink:#FFF4D6;--muted:#B9C0EA;--line:#FFF4D6;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141A3A;--card:#232C63;--ink:#FFF4D6;--muted:#B9C0EA;--line:#FFF4D6;color-scheme:dark}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-text-size-adjust:100%;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;padding:10px 14px 12px;gap:8px;max-width:1500px;margin:0 auto}
+header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h1{font-size:clamp(1.1rem,3vw,2rem);margin:0;flex:1;min-width:200px;line-height:1.1}
+.pill{background:var(--card);border:3px solid var(--line);border-radius:999px;padding:4px 14px;font-weight:800;font-size:clamp(.95rem,2vw,1.3rem);white-space:nowrap}
+.ib{min-width:48px;height:48px;border-radius:14px;border:3px solid var(--line);background:var(--sun);color:#1F2A5C;font-size:1.3rem;cursor:pointer;box-shadow:0 4px 0 var(--line);padding:0 10px;font-weight:800;touch-action:manipulation}
+.ib:active{transform:translateY(3px);box-shadow:0 1px 0 var(--line)}
+#msg{min-height:2.6em;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:clamp(1rem,2.1vw,1.4rem);padding:4px 10px;border-radius:14px;background:var(--card);border:3px dashed var(--line)}
+#msg.ok{background:#D6F7E3;color:#0E5C3A;border:3px solid var(--good)}#msg.bad{background:#FFDADB;color:#8E1B22;border:3px solid var(--bad)}
+#tray{flex:1;min-height:90px;overflow:auto;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-content:flex-start;padding:8px;border-radius:22px;background:rgba(120,150,255,.12);border:3px solid transparent}
+.dc{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:clamp(92px,13vw,150px);padding:8px 10px;border:4px solid var(--line);border-radius:20px;background:var(--card);color:var(--ink);box-shadow:0 5px 0 var(--line);cursor:grab;font:inherit;font-weight:800;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.dc .ic{font-size:clamp(1.8rem,4.2vw,3rem);line-height:1.1}.dc .nm{font-size:clamp(.85rem,1.6vw,1.1rem);text-align:center}
+.dc:hover{transform:translateY(-2px)}.dc.sel{outline:5px solid var(--sun);background:#FFF6D1;color:#1F2A5C}
+.dc.drag{position:fixed;z-index:50;cursor:grabbing;transform:scale(1.08) rotate(-3deg);box-shadow:0 14px 28px rgba(0,0,0,.35)}
+.dc.shake{animation:shk .45s}.ph{visibility:hidden}
+@keyframes shk{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+#bks{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(8px,1.6vw,18px)}
+.bk{position:relative;display:flex;flex-direction:column;min-height:clamp(150px,27vh,270px);border:5px solid var(--line);border-radius:24px 24px 44px 44px;background:var(--card);overflow:hidden;box-shadow:0 6px 0 var(--line);cursor:pointer;transition:transform .15s,background .2s}
+.bk .hd{padding:8px 6px;text-align:center;font-weight:800;font-size:clamp(1rem,2.4vw,1.7rem);color:#1F2A5C}
+.bk .hd small{display:block;font-size:clamp(.7rem,1.3vw,.95rem);font-weight:700;opacity:.85}
+.zone{flex:1;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;padding:8px}
+.chip{background:rgba(120,150,255,.18);border-radius:12px;padding:2px 8px;font-size:clamp(.78rem,1.4vw,1rem);font-weight:800;animation:pop .35s}
+@keyframes pop{from{transform:scale(.3)}}
+.badge{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(4rem,10vw,7rem);font-weight:900;opacity:0;pointer-events:none;color:#fff;text-shadow:0 4px 0 rgba(0,0,0,.3)}
+.bk.hov{transform:scale(1.04);background:#FFF6D1;color:#1F2A5C}
+.bk.gl{background:#CFF6DC!important;border-color:var(--good)!important;box-shadow:0 0 0 6px rgba(31,179,90,.5),0 6px 0 var(--good)}.bk.gl .badge{opacity:.9;color:var(--good)}
+.bk.rd{background:#FFD5D7!important;border-color:var(--bad)!important;box-shadow:0 0 0 6px rgba(229,72,77,.5),0 6px 0 var(--bad);animation:shk .45s}.bk.rd .badge{opacity:.9;color:var(--bad)}
+.bk.gl,.bk.rd{color:#1F2A5C}
+.ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,15,50,.8);padding:16px;z-index:100;overflow:auto}.ov.on{display:flex}
+.box{background:var(--card);border:5px solid var(--line);border-radius:30px;box-shadow:0 8px 0 var(--line);padding:clamp(16px,3vw,32px);max-width:700px;width:100%;text-align:center}
+.box h2{margin:4px 0 8px;font-size:clamp(1.6rem,4.5vw,2.6rem)}.box p{margin:6px 0;font-weight:700;color:var(--muted);font-size:clamp(1rem,2vw,1.3rem)}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:12px 0;text-align:left}.legend div{border:3px solid var(--line);border-radius:14px;padding:8px 10px;font-weight:700;font-size:.95rem;color:#1F2A5C}
+.row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:14px 0}
+.btn{font:inherit;font-weight:800;font-size:clamp(1.05rem,2.3vw,1.5rem);border:4px solid var(--line);border-radius:18px;padding:12px 24px;min-height:56px;background:#FF6B8B;color:#fff;cursor:pointer;box-shadow:0 5px 0 var(--line);touch-action:manipulation}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--line)}.btn.alt{background:var(--card);color:var(--ink)}.btn.go{background:#27C9A0;color:#08311F}
+.st{font-size:2.6rem;color:#E8A400;letter-spacing:6px}.big{font-size:4rem;line-height:1}
+:focus-visible{outline:4px solid var(--sun);outline-offset:3px}
+@media (max-width:560px){.dc{min-width:84px;padding:6px}.chip{font-size:.7rem;padding:1px 5px}.bk{border-width:4px}#app{padding:8px}}
+@media (min-width:1600px){html{font-size:118%}}@media (min-width:2200px){html{font-size:150%}}
+@media (max-height:560px){.bk{min-height:110px}#msg{min-height:2em}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🧺 Сортувальник пристроїв комп’ютера</h1>
+    <div class="pill">✅ <span id="ok">0</span> / <span id="tot">9</span></div>
+    <div class="pill">❌ <span id="er">0</span></div>
+    <button class="ib" id="br" type="button" aria-label="Почати спочатку">🔄</button>
+    <button class="ib" id="bs" type="button" aria-label="Звук">🔊</button>
+    <button class="ib" id="bf" type="button" aria-label="На весь екран">⛶</button>
+  </header>
+  <div id="msg">Перетягни картку в потрібний кошик (або торкнись картки, а потім кошика)</div>
+  <section id="tray" aria-label="Картки пристроїв"></section>
+  <section id="bks" aria-label="Кошики">
+    <div class="bk" data-k="in" tabindex="0" role="button" aria-label="Кошик: Введення" style="--c:#4CB5F5"><div class="hd" style="background:#4CB5F5">📥 Введення<small>передають у комп’ютер</small></div><div class="zone"></div><div class="badge"></div></div>
+    <div class="bk" data-k="out" tabindex="0" role="button" aria-label="Кошик: Виведення"><div class="hd" style="background:#FF9F6B">📤 Виведення<small>показують результат</small></div><div class="zone"></div><div class="badge"></div></div>
+    <div class="bk" data-k="st" tabindex="0" role="button" aria-label="Кошик: Збереження"><div class="hd" style="background:#9C88FF">🗃️ Збереження<small>зберігають файли</small></div><div class="zone"></div><div class="badge"></div></div>
+  </section>
+</div>
+
+<div class="ov on" id="menu"><div class="box">
+  <div class="big" aria-hidden="true">🖥️🧺</div>
+  <h2>Сортувальник пристроїв</h2>
+  <p>Перетягуй картки в потрібні кошики!</p>
+  <div class="legend">
+    <div style="background:#D8EEFF">📥 <b>Введення</b> — передають інформацію в комп’ютер</div>
+    <div style="background:#FFE3D2">📤 <b>Виведення</b> — показують або озвучують результат</div>
+    <div style="background:#E6E0FF">🗃️ <b>Збереження</b> — зберігають файли</div>
+  </div>
+  <div class="row"><button class="btn go" data-m="easy" type="button">🐢 Легко (9 пристроїв)</button><button class="btn" data-m="hard" type="button">🚀 Складно (18 пристроїв)</button></div>
+</div></div>
+
+<div class="ov" id="end"><div class="box">
+  <div class="big" aria-hidden="true">🎉</div><h2>Усе розсортовано!</h2><div class="st" id="es">★★★</div>
+  <p id="e1"></p><p id="e2"></p>
+  <div class="row"><button class="btn go" id="ea" type="button">🔄 Ще раз</button><button class="btn alt" id="em" type="button">🏠 Рівень</button></div>
+</div></div>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var K={in:"Введення",out:"Виведення",st:"Збереження"};
+var DV=[
+["Миша","🖱️","in","Миша керує курсором і передає команди в комп’ютер."],
+["Клавіатура","⌨️","in","Клавіатура вводить літери, цифри й команди."],
+["Мікрофон","🎤","in","Мікрофон записує звук і передає його в комп’ютер."],
+["Веб-камера","📷","in","Веб-камера передає зображення в комп’ютер."],
+["Джойстик","🕹️","in","Джойстик передає в комп’ютер рухи гравця."],
+["Сканер","📠","in","Сканер переносить малюнок чи текст з паперу в комп’ютер."],
+["Монітор","🖥️","out","Монітор показує зображення."],
+["Принтер","🖨️","out","Принтер друкує текст і малюнки на папері."],
+["Навушники","🎧","out","Навушники відтворюють звук для однієї людини."],
+["Колонки","🔊","out","Колонки озвучують музику й голос."],
+["Проєктор","📽️","out","Проєктор показує зображення на великому екрані."],
+["Телевізор","📺","out","Телевізор виводить картинку та звук."],
+["Флешка","💾","st","Флешка зберігає файли, і її можна носити з собою."],
+["Жорсткий диск","🗄️","st","Жорсткий диск зберігає багато файлів усередині комп’ютера."],
+["CD-диск","💿","st","На CD-диску зберігають музику й файли."],
+["DVD-диск","📀","st","DVD-диск вміщує більше даних, наприклад фільм."],
+["Карта пам’яті","📇","st","Карта пам’яті зберігає фото й відео в телефоні та фотоапараті."],
+["Хмарне сховище","☁️","st","Хмарне сховище зберігає файли в інтернеті."]];
+var mode="easy",ok=0,er=0,total=9,sel=null,drag=null,wr={},sound=true,AC=null,lastDrop=0;
+var tray=$("tray"),bks=[].slice.call(document.querySelectorAll(".bk"));
+function sh(a){return a.slice().sort(function(){return Math.random()-.5})}
+function beep(f,d,ty,v,dl){if(!sound||!AC)return;var o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+(dl||0);o.type=ty||"sine";o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v||.12,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d+.03)}
+function snd(k){if(k=="o"){beep(660,.1);beep(990,.14,"sine",.12,.08)}else if(k=="e")beep(180,.28,"sawtooth",.1);else if(k=="w")[523,659,784,1047].forEach(function(f,i){beep(f,.2,"triangle",.13,i*.1)});else beep(500,.05,"sine",.06)}
+function say(t,c){var m=$("msg");m.textContent=t;m.className=c||""}
+function upd(){$("ok").textContent=ok;$("tot").textContent=total;$("er").textContent=er}
+function build(){var s=[];["in","out","st"].forEach(function(k){var a=sh(DV.map(function(d,i){return i}).filter(function(i){return DV[i][2]==k}));s=s.concat(mode=="easy"?a.slice(0,3):a)});
+ s=sh(s);total=s.length;ok=0;er=0;wr={};sel=null;tray.innerHTML="";
+ s.forEach(function(i){var b=document.createElement("button");b.type="button";b.className="dc";b.dataset.i=i;b.setAttribute("aria-label",DV[i][0]);b.innerHTML='<span class="ic" aria-hidden="true">'+DV[i][1]+'</span><span class="nm">'+DV[i][0]+"</span>";tray.appendChild(b)});
+ bks.forEach(function(b){b.querySelector(".zone").innerHTML="";b.classList.remove("gl","rd","hov")});
+ say("Перетягни картку в потрібний кошик (або торкнись картки, а потім кошика)");upd()}
+function flash(b,c,s){b.querySelector(".badge").textContent=s;b.classList.add(c);setTimeout(function(){b.classList.remove(c)},850)}
+function tryDrop(c,b){var i=+c.dataset.i,d=DV[i];
+ if(d[2]==b.dataset.k){flash(b,"gl","✔");var ch=document.createElement("span");ch.className="chip";ch.textContent=d[1]+" "+d[0];b.querySelector(".zone").appendChild(ch);
+  c.remove();if(sel===c)sel=null;ok++;upd();say("✅ Правильно! "+d[3],"ok");snd("o");if(ok==total)setTimeout(finish,1000)}
+ else{er++;wr[i]=(wr[i]||0)+1;flash(b,"rd","✖");c.classList.remove("shake");void c.offsetWidth;c.classList.add("shake");c.classList.remove("sel");if(sel===c)sel=null;
+  say("❌ "+d[0]+" — не «"+K[b.dataset.k]+"». Спробуй ще раз!"+(wr[i]>=2?" 💡 Підказка: "+d[3]:""),"bad");snd("e");upd()}}
+function at(x,y){for(var i=0;i<bks.length;i++){var r=bks[i].getBoundingClientRect();if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return bks[i]}return null}
+function hover(b){bks.forEach(function(k){k.classList.toggle("hov",k===b)})}
+function select(c){if(sel)sel.classList.remove("sel");if(sel===c){sel=null;say("Перетягни картку в потрібний кошик");return}sel=c;c.classList.add("sel");say("Тепер торкнись кошика, куди належить «"+DV[+c.dataset.i][0]+"»","");snd("t")}
+
+/* перетягування (миша, дотик, перо) */
+tray.addEventListener("pointerdown",function(e){var c=e.target.closest(".dc");if(!c||e.button>0)return;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.resume)AC.resume()}catch(x){}
+ var r=c.getBoundingClientRect();drag={c:c,sx:e.clientX,sy:e.clientY,ox:e.clientX-r.left,oy:e.clientY-r.top,w:r.width,h:r.height,mv:false,id:e.pointerId,ph:null};try{c.setPointerCapture(e.pointerId)}catch(x){}});
+document.addEventListener("pointermove",function(e){if(!drag||e.pointerId!=drag.id)return;var c=drag.c;
+ if(!drag.mv&&Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>7){drag.mv=true;var ph=document.createElement("div");ph.className="ph dc";ph.style.cssText="width:"+drag.w+"px;height:"+drag.h+"px;border-color:transparent;box-shadow:none";c.parentNode.insertBefore(ph,c);drag.ph=ph;
+  c.style.width=drag.w+"px";c.style.height=drag.h+"px";c.classList.add("drag");if(sel&&sel!==c){sel.classList.remove("sel");sel=null}}
+ if(drag.mv){c.style.left=(e.clientX-drag.ox)+"px";c.style.top=(e.clientY-drag.oy)+"px";hover(at(e.clientX,e.clientY));e.preventDefault()}});
+function endDrag(e,cancel){if(!drag||e.pointerId!=drag.id)return;var d=drag,c=d.c;drag=null;hover(null);
+ if(!d.mv){if(!cancel)select(c);return}
+ var b=cancel?null:at(e.clientX,e.clientY);c.classList.remove("drag");c.style.cssText="";if(d.ph&&d.ph.parentNode)d.ph.parentNode.replaceChild(c,d.ph);lastDrop=Date.now();
+ if(b)tryDrop(c,b);else say("Відпусти картку над кошиком 🧺","")}
+document.addEventListener("pointerup",function(e){endDrag(e,false)});document.addEventListener("pointercancel",function(e){endDrag(e,true)});
+tray.addEventListener("keydown",function(e){var c=e.target.closest(".dc");if(c&&(e.key=="Enter"||e.key==" ")){e.preventDefault();select(c)}});
+bks.forEach(function(b){function go(){if(Date.now()-lastDrop<250)return;if(sel)tryDrop(sel,b);else say("Спершу обери картку 👆","")}
+ b.addEventListener("click",go);b.addEventListener("keydown",function(e){if(e.key=="Enter"||e.key==" "){e.preventDefault();go()}})});
+
+/* екрани */
+function finish(){snd("w");var lim=total>9?[2,6]:[1,4],n=er<=lim[0]?3:er<=lim[1]?2:1;
+ $("es").textContent="★★★".slice(0,n)+"☆☆☆".slice(0,3-n);$("e1").textContent="✅ Розсортовано: "+total+" пристроїв";$("e2").textContent=er?"❌ Помилок: "+er+" — наступного разу буде ще краще!":"❌ Помилок: 0 — бездоганно! 🏆";$("end").classList.add("on")}
+[].forEach.call(document.querySelectorAll("[data-m]"),function(b){b.onclick=function(){mode=b.dataset.m;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.resume)AC.resume()}catch(x){}build();$("menu").classList.remove("on")}});
+$("ea").onclick=function(){$("end").classList.remove("on");build()};$("em").onclick=function(){$("end").classList.remove("on");$("menu").classList.add("on")};
+$("br").onclick=build;
+$("bs").onclick=function(){sound=!sound;$("bs").textContent=sound?"🔊":"🔇"};
+$("bf").onclick=function(){var d=document;if(d.fullscreenElement)d.exitFullscreen();else if(d.documentElement.requestFullscreen){var p=d.documentElement.requestFullscreen();if(p&&p.catch)p.catch(function(){})}};
+build();
+})();
+</script>
+</body>
+</html>

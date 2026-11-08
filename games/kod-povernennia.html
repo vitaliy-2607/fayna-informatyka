@@ -1,0 +1,1850 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Код повернення</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: full-bleed 3D stage; program console docks below (phone) or right (wide). Single dark "mission console" look. */
+:root{
+  --space:#060912;
+  --glass:rgba(13,19,33,.86);
+  --glass-2:rgba(22,31,52,.92);
+  --line:rgba(150,180,230,.16);
+  --ink:#e9eef7;
+  --muted:#8e9ab0;
+  --neon:#62e3ff;
+  --amber:#ffb547;
+  --violet:#b590ff;
+  --mint:#6ee7a8;
+  --pink:#ff8ac6;
+  --slate:#9aa7bd;
+  --danger:#ff6b81;
+  --font-display:"Unbounded","Manrope",system-ui,sans-serif;
+  --font-ui:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px;
+  color-scheme:dark;
+}
+html,body{height:100%;background:var(--space);color:var(--ink);overflow:hidden}
+body{font-family:var(--font-ui);font-size:14px;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
+#app{height:100%;display:grid;grid-template-rows:minmax(0,1fr) auto;position:relative}
+#stage{position:relative;min-height:0;overflow:hidden}
+#stage canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block;touch-action:none}
+@media (min-width:900px) and (min-aspect-ratio:1/1){
+  #app{grid-template-rows:1fr;grid-template-columns:minmax(0,1fr) auto}
+  #panel{width:400px;border-top:0!important;border-left:1px solid var(--line);overflow:auto}
+}
+
+/* HUD */
+#hud{position:absolute;inset:0 0 auto;display:flex;align-items:center;gap:10px;
+  padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(180deg,rgba(6,9,18,.85),rgba(6,9,18,0));pointer-events:none;z-index:3}
+#hud>*{pointer-events:auto}
+.iconbtn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--glass);border:1px solid var(--line)}
+.iconbtn svg{width:20px;height:20px}
+.langbtn .lt{font-family:var(--font-display);font-weight:700;font-size:11px;letter-spacing:.04em;color:var(--neon)}
+.menu-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.lang{display:inline-flex;padding:3px;border-radius:10px;background:rgba(13,19,33,.8);border:1px solid var(--line)}
+.lang button{padding:6px 10px;border-radius:8px;font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.lang button[aria-pressed="true"]{background:var(--neon);color:#04121a}
+.hud-title{flex:1;min-width:0}
+.hud-level{font-family:var(--font-display);font-weight:700;font-size:17px;letter-spacing:.01em}
+.hud-stage{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-stats{display:flex;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--glass);border:1px solid var(--line);font-weight:700;font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap}
+.chip i{width:8px;height:8px;border-radius:2px;transform:rotate(45deg);background:var(--neon);box-shadow:0 0 8px var(--neon)}
+.chip.pulse{animation:pulse .5s ease}
+@keyframes pulse{50%{transform:scale(1.12);border-color:var(--neon)}}
+
+/* toast */
+#toast{position:absolute;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));bottom:14px;z-index:4;
+  display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:var(--r);background:var(--glass-2);border:1px solid rgba(98,227,255,.35);
+  box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:560px;margin:0 auto}
+#toast p{margin:0;flex:1;line-height:1.45;font-size:13.5px}
+#toast b{color:var(--neon)}
+#toast button{padding:8px 12px;border-radius:10px;background:rgba(98,227,255,.14);color:var(--neon);font-weight:700;white-space:nowrap}
+
+/* Panel */
+#panel{background:var(--glass);border-top:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  padding-block:12px calc(12px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:10px;z-index:2}
+#rows{display:flex;flex-direction:column;gap:8px}
+.prow{display:flex;gap:8px;align-items:flex-start;padding:6px;border-radius:12px;border:1px solid transparent;transition:border-color .2s,background .2s}
+.prow.active{border-color:rgba(98,227,255,.45);background:rgba(98,227,255,.06)}
+.prow.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.plabel{width:40px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:4px}
+.plabel b{font-family:var(--font-display);font-size:12px;letter-spacing:.04em}
+.plabel span{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.slots{display:flex;flex-wrap:wrap;gap:5px;flex:1;min-width:0}
+.slot{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;border:1.5px dashed rgba(150,180,230,.22);position:relative}
+.slot.filled{border-style:solid;border-color:transparent;background:var(--c);color:#0b1020}
+.slot.filled svg{width:20px;height:20px}
+.slot.exec{box-shadow:0 0 0 2px #fff,0 0 16px var(--c)}
+.slot .fn{font-family:var(--font-display);font-weight:700;font-size:12px}
+#palette{display:flex;gap:6px;flex-wrap:wrap}
+.cmd{flex:1 1 40px;min-width:40px;max-width:64px;height:46px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 16%,transparent);
+  color:var(--c);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);transition:transform .1s}
+.cmd:active{transform:scale(.94)}
+.cmd svg{width:22px;height:22px}
+.cmd .fn{font-family:var(--font-display);font-weight:700;font-size:14px}
+.cmd:disabled{opacity:.28;cursor:not-allowed}
+.actions{display:flex;gap:8px}
+.ghost{padding:0 12px;height:44px;border-radius:12px;border:1px solid var(--line);color:var(--muted);font-weight:700;font-size:13px}
+.primary{height:44px;padding:0 18px;border-radius:12px;background:var(--neon);color:#04121a;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:0 0 24px rgba(98,227,255,.35)}
+.primary.stop{background:var(--danger);box-shadow:0 0 24px rgba(255,107,129,.35);color:#1a0509}
+#btnRun{flex:1}
+.primary svg{width:16px;height:16px}
+
+/* Menu */
+#menu{position:absolute;inset:0;z-index:5;display:flex;align-items:flex-end;pointer-events:none;
+  background:linear-gradient(0deg,rgba(6,9,18,.96) 0%,rgba(6,9,18,.6) 45%,rgba(6,9,18,0) 70%)}
+.menu-sheet{pointer-events:auto;width:100%;max-height:72%;overflow:auto;
+  padding-block:20px calc(20px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:14px;scrollbar-width:thin}
+@media (min-width:900px) and (min-aspect-ratio:1/1){
+  #menu{align-items:stretch;background:linear-gradient(90deg,rgba(6,9,18,.97) 0%,rgba(6,9,18,.75) 440px,rgba(6,9,18,0) 720px)}
+  .menu-sheet{width:470px;max-height:none;padding-block:44px;padding-left:max(40px,env(safe-area-inset-left,0px));padding-right:24px;justify-content:center}
+}
+.eyebrow{margin:0;color:var(--neon);font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+h1{margin:0;font-family:var(--font-display);font-weight:700;font-size:clamp(28px,7vw,44px);line-height:1.02;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--neon);text-shadow:0 0 22px rgba(98,227,255,.5)}
+.lede{margin:0;color:#c3cbda;line-height:1.55;max-width:58ch;font-size:14.5px}
+.progress{display:flex;align-items:center;gap:12px}
+.pbar{flex:1;height:8px;border-radius:99px;background:rgba(150,180,230,.12);overflow:hidden}
+.pbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--neon),#a7f3ff);box-shadow:0 0 12px var(--neon);transition:width .6s}
+#ptext{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted)}
+#ptext b{color:var(--ink)}
+.big{height:52px;font-size:15px;width:100%}
+.stages{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.stab{padding:8px 4px;border-radius:12px;border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(13,19,33,.6)}
+.stab b{font-family:var(--font-display);font-size:13px}
+.stab span{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stab.on{border-color:var(--neon);background:rgba(98,227,255,.08)}
+.stab .mini{width:100%;height:3px;border-radius:9px;background:rgba(150,180,230,.14);overflow:hidden}
+.stab .mini i{display:block;height:100%;background:var(--neon)}
+.stageinfo{padding:12px 14px;border-radius:var(--r);background:rgba(13,19,33,.7);border:1px solid var(--line);display:flex;flex-direction:column;gap:6px;line-height:1.45}
+.stageinfo h2{margin:0;font-family:var(--font-display);font-size:15px;font-weight:500}
+.stageinfo p{margin:0;font-size:13px;color:#c3cbda}
+.stageinfo .k{color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-right:6px}
+.levels{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px}
+.lv{height:48px;border-radius:12px;border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:rgba(13,19,33,.7);font-weight:800;font-variant-numeric:tabular-nums}
+.lv .st{display:flex;gap:2px}
+.lv .st i{width:5px;height:5px;border-radius:50%;background:rgba(150,180,230,.2)}
+.lv .st i.on{background:var(--amber);box-shadow:0 0 5px var(--amber)}
+.lv.done{border-color:rgba(98,227,255,.35)}
+.lv.next{background:var(--neon);color:#04121a;border-color:var(--neon);box-shadow:0 0 16px rgba(98,227,255,.4)}
+.lv.next .st i{background:rgba(4,18,26,.3)}
+.lv.locked{opacity:.35;cursor:not-allowed}
+.lv.boss{border-style:dashed}
+.menu-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--muted);font-size:12px}
+.linkbtn{color:var(--muted);text-decoration:underline;text-underline-offset:3px;font-size:12px;padding:6px 0}
+
+/* Modal */
+#modal{position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:rgba(3,6,12,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}
+.card{width:100%;max-width:420px;background:var(--glass-2);border:1px solid var(--line);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:12px;
+  box-shadow:0 30px 80px rgba(0,0,0,.5);animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.92);opacity:0}}
+.card h2{margin:0;font-family:var(--font-display);font-size:22px;font-weight:700;text-wrap:balance}
+.card p{margin:0;color:#c3cbda;line-height:1.5}
+.card .row{display:flex;gap:8px;flex-wrap:wrap}
+.card .row>*{flex:1}
+.stars{display:flex;gap:8px}
+.stars svg{width:34px;height:34px}
+.partline{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:rgba(98,227,255,.08);border:1px solid rgba(98,227,255,.25)}
+.partline i{width:10px;height:10px;transform:rotate(45deg);background:var(--neon);box-shadow:0 0 10px var(--neon);flex:none}
+.reward{padding:12px 14px;border-radius:12px;background:rgba(255,181,71,.1);border:1px solid rgba(255,181,71,.35);color:#ffe2b0;line-height:1.5}
+.reward b{color:var(--amber);display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px}
+.fact{padding:12px 14px;border-radius:12px;background:rgba(98,227,255,.07);border:1px solid rgba(98,227,255,.22);line-height:1.5;color:#d6e3f2}
+.fact b{color:var(--neon);display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px}
+.stat{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+
+#bigText{position:absolute;inset:0;display:grid;place-items:center;z-index:6;pointer-events:none;font-family:var(--font-display);font-weight:700;
+  font-size:clamp(64px,22vw,180px);color:#fff;text-shadow:0 0 40px var(--neon)}
+#caption{position:absolute;z-index:6;top:calc(14px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);width:min(92%,460px);text-align:center;
+  padding:12px 16px;border-radius:16px;background:var(--glass-2);border:1px solid rgba(98,227,255,.35);box-shadow:0 10px 30px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:4px}
+#caption b{font-family:var(--font-display);font-weight:500;font-size:13px;color:var(--neon);letter-spacing:.02em}
+#caption span{font-size:16px;font-weight:700;line-height:1.35;text-wrap:balance}
+.replay{align-self:flex-start;margin-top:4px;padding:8px 12px;border-radius:10px;background:rgba(98,227,255,.12);color:var(--neon);font-weight:700;font-size:13px}
+#loading{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:var(--space);text-align:center;padding-inline:24px}
+#loading p{color:var(--muted);margin:10px 0 0}
+#loading h2{margin:0;font-family:var(--font-display);font-size:22px}
+.spin{width:38px;height:38px;border-radius:50%;border:3px solid rgba(98,227,255,.2);border-top-color:var(--neon);margin:0 auto 16px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* Phone held sideways: 3D on the left, a compact program column on the right, everything sized to fit without scrolling */
+@media (orientation:landscape) and (max-height:560px){
+  #app{grid-template-rows:1fr;grid-template-columns:minmax(0,1fr) auto}
+  #panel{width:clamp(250px,40vw,330px);border-top:0;border-left:1px solid var(--line);overflow-y:auto;gap:6px;justify-content:center;
+    padding-block:calc(6px + env(safe-area-inset-top,0px)) calc(6px + env(safe-area-inset-bottom,0px));padding-left:10px;padding-right:max(10px,env(safe-area-inset-right,0px))}
+  #rows{gap:3px}
+  .prow{padding:3px;gap:6px;border-radius:10px}
+  .plabel{width:30px;padding-top:2px}
+  .plabel b{font-size:10.5px}.plabel span{font-size:10px}
+  .slots{gap:4px}
+  .slot{width:30px;height:30px;border-radius:8px}
+  .slot.filled svg{width:16px;height:16px}.slot .fn{font-size:10px}
+  #palette{gap:4px;flex-wrap:nowrap}
+  .cmd{min-width:0;flex:1 1 0;height:36px;border-radius:9px}
+  .cmd svg{width:18px;height:18px}.cmd .fn{font-size:11px}
+  .actions{gap:5px}
+  .ghost{height:36px;padding:0 9px;font-size:12px;border-radius:9px}
+  .primary{height:36px;padding:0 12px;font-size:13px;border-radius:9px}
+  #hud{padding:6px 10px 6px max(10px,env(safe-area-inset-left,0px));gap:6px}
+  .iconbtn{width:32px;height:32px;border-radius:9px}.iconbtn svg{width:16px;height:16px}
+  .hud-level{font-size:14px}.hud-stage{font-size:10.5px}
+  .chip{padding:4px 8px;font-size:11px;gap:4px}
+  .hud-stats{gap:4px}
+  #toast{left:max(10px,env(safe-area-inset-left,0px));right:10px;bottom:8px;padding:8px 10px;gap:8px;border-radius:12px;max-width:none}
+  #toast p{font-size:12px;line-height:1.35}#toast button{padding:6px 9px;font-size:12px}
+  #menu{align-items:stretch;background:linear-gradient(90deg,rgba(6,9,18,.97) 0%,rgba(6,9,18,.82) 50%,rgba(6,9,18,0) 75%)}
+  .menu-sheet{width:min(56vw,440px);max-height:none;height:100%;gap:9px;
+    padding-block:calc(12px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:12px}
+  h1{font-size:26px}.lede{font-size:12.5px;line-height:1.45}.eyebrow{font-size:10px}
+  .big{height:40px;font-size:13.5px}
+  .stab{padding:5px 2px}.stab b{font-size:11px}.stab span{font-size:9.5px}
+  .stageinfo{padding:8px 10px;gap:4px}.stageinfo h2{font-size:13px}.stageinfo p{font-size:11.5px}
+  .levels{grid-template-columns:repeat(10,1fr);gap:4px}
+  .lv{height:34px;border-radius:8px;font-size:11px;gap:2px}.lv .st i{width:4px;height:4px}
+  .menu-foot{font-size:10.5px}
+  #modal{padding-block:8px}
+  .card{max-width:min(560px,92vw);max-height:calc(100% - 16px);overflow:auto;padding:14px 16px;gap:8px;border-radius:16px}
+  .card h2{font-size:18px}.card p,.fact,.reward,.partline{font-size:12.5px;line-height:1.4}
+  .fact,.reward,.partline{padding:8px 10px}
+  .stars svg{width:24px;height:24px}
+  .card .row>*{height:38px}
+  #caption{top:calc(8px + env(safe-area-inset-top,0px));padding:8px 12px}#caption span{font-size:13px}#caption b{font-size:11px}
+  #bigText{font-size:clamp(48px,26vh,140px)}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important}}
+</style>
+
+<div id="app">
+  <div id="stage">
+    <div id="hud" hidden>
+      <button id="btnMenu" class="iconbtn" data-i18n-aria="menuAria" aria-label="До меню рівнів"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg></button>
+      <div class="hud-title"><div class="hud-level" id="hudLevel">Рівень 1</div><div class="hud-stage" id="hudStage"></div></div>
+      <button class="iconbtn langbtn" data-langtoggle aria-label="English / Українська"><span class="lt"></span></button>
+      <div class="hud-stats"><span class="chip" id="hudParts"><i></i><span>0/1</span></span><span class="chip" id="hudTick">Такт 0</span></div>
+    </div>
+    <div id="toast" hidden><p id="toastText"></p><button id="toastClose" data-i18n="gotIt">Зрозуміло</button></div>
+    <div id="bigText" hidden></div>
+    <div id="caption" hidden></div>
+  </div>
+  <section id="panel" hidden data-i18n-aria="programAria" aria-label="Програма космонавта">
+    <div id="rows"></div>
+    <div id="palette"></div>
+    <div class="actions">
+      <button id="btnClear" class="ghost" data-i18n="clear">Очистити</button>
+      <button id="btnSpeed" class="ghost">×1</button>
+      <button id="btnRun" class="primary"></button>
+    </div>
+  </section>
+  <div id="menu" hidden>
+    <div class="menu-sheet">
+      <div class="menu-top"><p class="eyebrow" data-i18n="eyebrow">Море Спокою · Позивний Інженер-01</p><div class="lang" role="group" data-i18n-aria="langAria" aria-label="Мова гри"><button data-lang="uk">УКР</button><button data-lang="en">ENG</button></div></div>
+      <h1 data-i18n-html="h1">Код <em>повернення</em></h1>
+      <p class="lede" data-i18n="lede">Космонавт застряг на Місяці. Програмуй його маршрут, збери 100 деталей нової ракети й поверни його на Землю.</p>
+      <div class="progress"><div class="pbar"><i id="pfill"></i></div><span id="ptext"></span></div>
+      <button id="btnContinue" class="primary big"></button>
+      <div class="stages" id="stageTabs"></div>
+      <div class="stageinfo" id="stageInfo"></div>
+      <div class="levels" id="levelGrid"></div>
+      <div class="menu-foot"><span data-i18n="saved">Прогрес зберігається в цьому браузері</span><button class="linkbtn" id="btnReset" data-i18n="reset">Скинути прогрес</button></div>
+    </div>
+  </div>
+  <div id="modal" hidden><div class="card" id="card"></div></div>
+  <div id="loading"><div><div class="spin"></div><h2 data-i18n="loadingH">Збираємо Місяць</h2><p id="loadMsg" data-i18n="loadingP">Генеруємо реголіт і зоряне небо…</p></div></div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+//#LOGIC-START
+let LANG = 'uk';
+const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+const K = (x, z) => x + ',' + z;
+function rng(seed) { let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const ri = (r, a, b) => a + Math.floor(r() * (b - a + 1));
+function shuffle(r, a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+const STAGES_UK = [
+  { name: 'Основа та каркас', goal: 'Зібрати міцну платформу, посадкові опори та силовий каркас.', play: 'Базові команди руху й повороту, перші невеликі кратери.', reward: 'Зібрано нижню частину ракети. Відкрито блок «Функція F1».' },
+  { name: 'Двигуни та паливна система', goal: 'Видобути реактивні сопла, паливні баки та магістралі живлення.', play: 'Зруйновані покриття й ліміт команд. Повторювані маршрути через функцію F1.', reward: 'Встановлено двигуни. Ракета отримала перші силові елементи.' },
+  { name: 'Електроніка та навігація', goal: 'Знайти бортові комп’ютери, сканери, сенсори та мікрочипи.', play: 'Динамічні перешкоди: хиткі плити й радіаційні імпульси. Потрібен точний алгоритм.', reward: 'Бортовий комп’ютер заряджено, на корпусі засвітилися неонові датчики.' },
+  { name: 'Системи життєзабезпечення', goal: 'Зібрати кисневі балони, сонячні батареї та термозахисні плити.', play: 'Довші лабіринти й дві функції: F1 і F2.', reward: 'Кабіна повністю герметична, сонячні панелі розкрито.' },
+  { name: 'Запуск і заправляння', goal: 'Зібрати очищені місячні кристали-паливо для фінального старту.', play: 'Найкоротші ліміти команд і задачі на оптимізацію коду.', reward: 'Усі деталі на місці. Ракета готова до старту!' },
+];
+const STAGES_EN = [
+  { name: 'Base and frame', goal: 'Build a strong platform, landing legs and a load-bearing frame.', play: 'Basic move and turn commands, the first small craters.', reward: 'The lower part of the rocket is assembled. The “Function F1” block is unlocked.' },
+  { name: 'Engines and fuel system', goal: 'Find rocket nozzles, fuel tanks and supply lines.', play: 'Broken surfaces and a command limit. Repeating routes with function F1.', reward: 'The engines are installed. The rocket has its first power systems.' },
+  { name: 'Electronics and navigation', goal: 'Find flight computers, scanners, sensors and microchips.', play: 'Moving hazards: wobbly plates and radiation pulses. You need a precise algorithm.', reward: 'The flight computer is charged, and neon sensors light up on the hull.' },
+  { name: 'Life support systems', goal: 'Collect oxygen tanks, solar batteries and heat shield tiles.', play: 'Longer mazes and two functions: F1 and F2.', reward: 'The cabin is fully sealed, and the solar panels are open.' },
+  { name: 'Launch and fuelling', goal: 'Collect purified Moon fuel crystals for the final launch.', play: 'The tightest command limits and code optimisation puzzles.', reward: 'Every part is in place. The rocket is ready for launch!' },
+];
+const ST = () => LANG === 'en' ? STAGES_EN : STAGES_UK;
+const PARTS = [
+  ['Посадкова платформа', 'platform', 'Платформа розподіляє вагу ракети, щоб та не провалилася в м’який місячний пил. Цей пил називається реголітом.'],
+  ['Опорна стійка А', 'strut', 'Посадкові опори розкриваються перед посадкою, як ноги павука. Такі опори мав місячний модуль «Аполлона».'],
+  ['Опорна стійка Б', 'strut', 'Опори роблять з алюмінієвих і титанових сплавів. Вони легкі й водночас дуже міцні.'],
+  ['Опорна стійка В', 'strut', 'Чотири опори тримають ракету стійко: якщо ґрунт під однією просяде, інші збережуть рівновагу.'],
+  ['Опорна стійка Г', 'strut', 'На кінцях опор є широкі «тарілки». Вони збільшують площу опори, як снігоступи на глибокому снігу.'],
+  ['Амортизатор А', 'shock', 'Амортизатор гасить удар під час посадки, як пружини у велосипеді чи автомобілі.'],
+  ['Амортизатор Б', 'shock', 'У місячного модуля «Аполлона» амортизатори були з алюмінієвих стільників, які зминалися під час удару.'],
+  ['Амортизатор В', 'shock', 'Без амортизаторів удар об поверхню міг би пошкодити двигуни й прилади ракети.'],
+  ['Амортизатор Г', 'shock', 'На Місяці сила тяжіння приблизно в 6 разів менша, ніж на Землі, тому все там падає повільніше.'],
+  ['Нижнє кільце каркаса', 'ring', 'Кільця каркаса тримають круглу форму корпусу, як обручі тримають бочку.'],
+  ['Силова балка 1', 'beam', 'Силові балки передають тягу двигунів на весь корпус, щоб ракета не зігнулася під час польоту.'],
+  ['Силова балка 2', 'beam', 'Інженери шукають баланс: ракета має бути міцною, але кожен зайвий кілограм вимагає більше пального.'],
+  ['Силова балка 3', 'beam', 'Багато сучасних ракет мають деталі з вуглепластику. Він легший за сталь і дуже міцний.'],
+  ['Силова балка 4', 'beam', 'Під час старту на ракету діють перевантаження: усе на борту ніби стає в кілька разів важчим.'],
+  ['Середнє кільце каркаса', 'ring', 'Корпус ракети часто збирають з окремих секцій, з’єднаних кільцями, як деталі конструктора.'],
+  ['Діагональна розпірка 1', 'brace', 'Розпірки утворюють трикутники. Трикутник найважче перекосити, тому він робить конструкцію жорсткою.'],
+  ['Діагональна розпірка 2', 'brace', 'Ферми з трикутників використовують у мостах, телевежах і на Міжнародній космічній станції.'],
+  ['Кріплення двигунів', 'mount', 'Кріплення двигунів витримує всю їхню тягу, тобто силу, яка штовхає ракету вгору.'],
+  ['Верхнє кільце каркаса', 'ring', 'На верхньому кільці стоять баки, тож воно має витримати їхню вагу разом із пальним.'],
+  ['Замок каркаса', 'lock', 'Замки з’єднують частини ракети. На справжніх ракетах вони можуть розкриватися в польоті, щоб відокремити порожній ступінь.'],
+  ['Сопло 1', 'nozzle', 'Сопло спрямовує розжарені гази вниз, і ракета летить угору. Це третій закон Ньютона: дія дорівнює протидії.'],
+  ['Сопло 2', 'nozzle', 'Сопло має форму дзвона: так гази розширюються й вилітають ще швидше, а ракета отримує більше тяги.'],
+  ['Сопло 3', 'nozzle', 'Гази вилітають із сопла зі швидкістю понад 3 кілометри за секунду. Це швидше за кулю.'],
+  ['Камера згоряння 1', 'chamber', 'У камері згоряння пальне змішується з окисником і горить. Температура там сягає близько 3000 °C.'],
+  ['Камера згоряння 2', 'chamber', 'Стінки камери охолоджує саме пальне: воно тече в каналах усередині стінок, перш ніж згоріти.'],
+  ['Камера згоряння 3', 'chamber', 'У космосі немає повітря, тому ракета везе з собою окисник. Без нього пальне не може горіти.'],
+  ['Турбонасос', 'turbopump', 'Турбонасос щосекунди подає в двигун сотні літрів пального. Його турбіна робить десятки тисяч обертів за хвилину.'],
+  ['Паливний бак, нижня секція', 'tank', 'Пальне становить понад 80 відсотків маси ракети на старті. Сама ракета порівняно з ним дуже легка.'],
+  ['Паливний бак, верхня секція', 'tank', 'Баки роблять тонкостінними. Деякі тримають форму завдяки тиску газу всередині, як надута кулька.'],
+  ['Бак окисника', 'oxTank', 'Найчастіше окисником є рідкий кисень. Щоб він залишався рідким, його охолоджують до мінус 183 °C.'],
+  ['Паливна магістраль 1', 'pipe', 'Магістралі — це труби, якими пальне біжить від баків до двигуна.'],
+  ['Паливна магістраль 2', 'pipe', 'У місцях з’єднань труби роблять гнучкими, бо під час польоту ракета сильно вібрує.'],
+  ['Магістраль окисника', 'pipe', 'Магістраль окисника вкривають ізоляцією, щоб надхолодний кисень не нагрівся й не закипів.'],
+  ['Клапан подачі', 'valve', 'Клапани відкривають і закривають подачу пального. Так двигун вмикають, вимикають і змінюють його тягу.'],
+  ['Регулятор тиску', 'regulator', 'Регулятор тиску стежить, щоб тиск у баках був саме таким, як треба: не завеликим і не замалим.'],
+  ['Теплоізоляція баків', 'insulation', 'Помаранчевий колір великого бака космічних шатлів — це колір його теплоізоляційної піни.'],
+  ['Кардан підвісу', 'gimbal', 'Кардан дає змогу нахиляти двигун. Так ракета кермує, ніби ти повертаєш ліхтарик у різні боки.'],
+  ['Привід керма тяги', 'actuator', 'Привід нахиляє двигун за командою комп’ютера, щоб ракета летіла рівно й не перекидалася.'],
+  ['Запальник', 'igniter', 'Запальник підпалює суміш пального й окисника в камері згоряння, як іскра запальнички.'],
+  ['Блок живлення двигунів', 'powerUnit', 'Блок живлення дає електрику клапанам, датчикам і приводам двигунів.'],
+  ['Бортовий комп’ютер', 'computer', 'Комп’ютер корабля «Аполлон» мав близько 4 кілобайтів оперативної пам’яті. Це в мільйони разів менше, ніж у сучасного смартфона.'],
+  ['Резервний комп’ютер', 'computer', 'У космосі важливі системи дублюють. Якщо головний комп’ютер зламається, керування перебере резервний.'],
+  ['Мікрочип навігації', 'chip', 'Чип навігації постійно обчислює, де ракета, куди й з якою швидкістю вона летить.'],
+  ['Мікрочип зв’язку', 'chip', 'Радіосигнал від Місяця до Землі летить приблизно 1,3 секунди.'],
+  ['Гіроскоп', 'gyro', 'Гіроскоп відчуває повороти й нахили. Крихітний гіроскоп є навіть у твоєму телефоні.'],
+  ['Акселерометр', 'accel', 'Акселерометр вимірює прискорення. За його даними комп’ютер обчислює швидкість ракети.'],
+  ['Зоряний сканер', 'starScanner', 'Зоряний сканер фотографує зорі й порівнює їх з картою неба. Так корабель точно знає, куди він повернутий.'],
+  ['Радар висоти', 'radar', 'Радар надсилає радіохвилі до поверхні й ловить їхнє відлуння. За часом польоту хвилі він визначає висоту.'],
+  ['Лідар', 'lidar', 'Лідар працює як радар, але замість радіохвиль використовує лазерне світло. Він будує тривимірну карту місцевості.'],
+  ['Сонячний датчик', 'sunSensor', 'Сонячний датчик знаходить Сонце, щоб правильно розвернути корабель і його сонячні панелі.'],
+  ['Антена зв’язку', 'antenna', 'Сигнали далеких космічних апаратів ловлять величезні антени на Землі діаметром до 70 метрів.'],
+  ['Передавач', 'transmitter', 'Передавач перетворює дані на радіохвилі. Зонд «Вояджер-1» надсилав сигнали з відстані понад 20 мільярдів кілометрів.'],
+  ['Датчик температури', 'tempSensor', 'На Місяці вдень буває понад +120 °C, а вночі нижче −170 °C. Датчики стежать, щоб прилади не перегрілися й не замерзли.'],
+  ['Датчик тиску', 'pressureSensor', 'Датчики тиску стежать за баками й кабіною. Раптове падіння тиску може означати витік.'],
+  ['Неонові датчики корпусу', 'neon', 'Світлові індикатори показують стан систем: зелений означає, що все гаразд, а червоний попереджає про проблему.'],
+  ['Шина даних', 'dataBus', 'Шина даних — це «дороги», якими прилади обмінюються інформацією з комп’ютером.'],
+  ['Блок пам’яті', 'memory', 'Пам’ять для космосу захищають від радіації, бо космічні частинки можуть випадково змінити дані.'],
+  ['Контролер живлення', 'powerCtrl', 'Контролер живлення вирішує, скільки електрики дати кожному приладу, і вимикає зайві, щоб зберегти заряд.'],
+  ['Панель приладів', 'panel', 'На панелі приладів пілот бачить швидкість, висоту, запас пального й стан усіх систем.'],
+  ['Модуль автопілота', 'autopilot', 'Сучасні ракети летять на автопілоті від старту до виходу на орбіту. Люди лише стежать за польотом.'],
+  ['Кисневий балон 1', 'o2', 'Людина вдихає близько 0,8 кілограма кисню на добу, тому запас кисню на кораблі рахують дуже ретельно.'],
+  ['Кисневий балон 2', 'o2', 'Кисень у балонах тримають під високим тиском, щоб у малий об’єм вмістилося багато газу.'],
+  ['Кисневий балон 3', 'o2', 'На Міжнародній космічній станції кисень добувають з води за допомогою електрики. Цей процес називається електролізом.'],
+  ['Фільтр CO₂', 'co2', 'Видихаючи, ми виділяємо вуглекислий газ. Фільтр поглинає його, щоб повітря в кабіні лишалося придатним для дихання.'],
+  ['Регенератор повітря', 'regenerator', 'Регенератор очищує повітря, щоб його можна було використовувати знову й знову.'],
+  ['Сонячна панель, ліва', 'solar', 'Сонячні панелі перетворюють світло на електрику. У космосі немає хмар, тому сонце світить на них постійно.'],
+  ['Сонячна панель, права', 'solar', 'Разом із сонячними панелями Міжнародна космічна станція має розмах понад 100 метрів, більше за футбольне поле.'],
+  ['Привід розкриття панелей', 'deployDrive', 'Під час старту панелі складені, як віяло. У космосі привід розкриває їх.'],
+  ['Акумулятор', 'battery', 'Акумулятор запасає енергію, щоб корабель мав електрику, коли опиниться в тіні Місяця чи Землі.'],
+  ['Термоплита 1', 'heatPlate', 'Коли корабель повертається на Землю, він врізається в атмосферу, і його обшивка нагрівається понад 1500 °C.'],
+  ['Термоплита 2', 'heatPlate', 'Плитки теплозахисту шатлів так погано проводили тепло, що розпечену плитку можна було тримати за краї руками.'],
+  ['Термоплита 3', 'heatPlate', 'Деякі теплові щити поступово обгорають і забирають жар із собою. Такі щити називають абляційними.'],
+  ['Термоплита 4', 'heatPlate', 'Під час входу в атмосферу корабель повертається щитом уперед, щоб гальмувати й не згоріти.'],
+  ['Ілюмінатор кабіни', 'window', 'Ілюмінатор має кілька шарів скла, щоб витримати перепад тиску й удари дрібних частинок.'],
+  ['Люк кабіни', 'hatch', 'Люк має швидко відкриватися на землі, але в польоті закриватися повністю герметично.'],
+  ['Ущільнювач люка', 'seal', 'Ущільнювач — це гнучке кільце, яке не випускає повітря з кабіни, навіть коли зовні вакуум.'],
+  ['Крісло пілота', 'seat', 'Крісла космонавтів роблять за формою тіла, щоб легше переносити перевантаження під час старту.'],
+  ['Система обігріву', 'heater', 'У тіні Місяця дуже холодно. Без обігріву прилади й людина швидко замерзли б.'],
+  ['Водяний бак', 'waterTank', 'На космічній станції більшу частину води очищують і використовують знову, навіть вологу з повітря.'],
+  ['Аптечка', 'firstAid', 'У космічній аптечці є ліки від головного болю, нудоти й безсоння, адже невагомість впливає на самопочуття.'],
+  ['Кристал-паливо №1', 'crystal', 'У нашій грі ракета летить на місячних кристалах. Справжні ракети використовують гас, рідкий водень або метан разом із рідким киснем.'],
+  ['Кристал-паливо №2', 'crystal', 'Рідкий водень — найлегше ракетне пальне. Щоб він не закипів, його тримають при мінус 253 °C.'],
+  ['Кристал-паливо №3', 'crystal', 'У темних кратерах біля полюсів Місяця знайшли водяний лід. У майбутньому з нього можна буде отримувати пальне й кисень.'],
+  ['Кристал-паливо №4', 'crystal', 'Тверде ракетне паливо на дотик схоже на гуму. Його використовують у бокових прискорювачах.'],
+  ['Кристал-паливо №5', 'crystal', 'Щоб назавжди покинути Землю, ракета має розігнатися приблизно до 11,2 кілометра за секунду.'],
+  ['Кристал-паливо №6', 'crystal', 'Щоб покинути Місяць, вистачить приблизно 2,4 кілометра за секунду, бо Місяць набагато легший за Землю.'],
+  ['Кристал-паливо №7', 'crystal', 'Щоб вийти на орбіту навколо Землі, потрібна швидкість близько 7,9 кілометра за секунду.'],
+  ['Кристал-паливо №8', 'crystal', 'Ракети ділять на ступені. Порожні баки скидають, щоб далі не везти зайву вагу.'],
+  ['Кристал-паливо №9', 'crystal', 'Ракета «Сатурн-5», яка відправила людей на Місяць, мала висоту 110 метрів. Це як 36-поверховий будинок.'],
+  ['Кристал-паливо №10', 'crystal', 'Політ «Аполлона» від Землі до Місяця тривав приблизно три доби.'],
+  ['Кристал-паливо №11', 'crystal', 'У середньому Місяць розташований за 384 тисячі кілометрів від Землі.'],
+  ['Кристал-паливо №12', 'crystal', 'Першими людьми на Місяці стали Ніл Армстронг і Базз Олдрін у 1969 році.'],
+  ['Кристал-паливо №13', 'crystal', 'На Місяці немає вітру й атмосфери, тому сліди астронавтів можуть зберігатися мільйони років.'],
+  ['Кристал-паливо №14', 'crystal', 'Українець Юрій Кондратюк ще на початку XX століття описав спосіб польоту на Місяць, яким пізніше скористалася програма «Аполлон».'],
+  ['Кристал-паливо №15', 'crystal', 'Сергій Корольов, уродженець Житомира, був головним конструктором першого супутника й корабля Юрія Гагаріна.'],
+  ['Кристал-паливо №16', 'crystal', 'Перший штучний супутник Землі запустили 1957 року. Він важив лише 83,6 кілограма.'],
+  ['Очищувач кристалів', 'purifier', 'Пальне очищують від домішок, бо навіть крихітна порошинка може закупорити форсунку двигуна.'],
+  ['Носовий обтічник', 'fairing', 'Обтічник має гостру форму, щоб ракета легше розрізала повітря. Коли ракета виходить з атмосфери, його скидають.'],
+  ['Система старту', 'launchSystem', 'Перед стартом ракету перевіряють тисячі датчиків. Якщо щось не так, комп’ютер зупинить запуск навіть за секунду до старту.'],
+  ['Ключ запуску', 'key', 'Усі деталі на місці! Від першої опори до ключа запуску ти зібрав справжню ракету. Час летіти додому.'],
+];
+const PARTS_EN = [
+  ['Landing platform', 'The platform spreads the rocket’s weight so it doesn’t sink into the soft lunar dust. This dust is called regolith.'],
+  ['Landing leg A', 'Landing legs unfold before touchdown, like a spider’s legs. The Apollo lunar module had legs like these.'],
+  ['Landing leg B', 'Legs are made of aluminium and titanium alloys. They are light and very strong at the same time.'],
+  ['Landing leg C', 'Four legs keep the rocket steady: if the ground sinks under one, the others keep it balanced.'],
+  ['Landing leg D', 'Each leg ends in a wide footpad. It spreads the load, like snowshoes on deep snow.'],
+  ['Shock absorber A', 'A shock absorber softens the landing, like the springs in a bicycle or a car.'],
+  ['Shock absorber B', 'The Apollo lunar module’s shock absorbers were made of aluminium honeycomb that crushed on impact.'],
+  ['Shock absorber C', 'Without shock absorbers, a hard landing could damage the engines and instruments.'],
+  ['Shock absorber D', 'Gravity on the Moon is about 6 times weaker than on Earth, so everything falls more slowly there.'],
+  ['Lower frame ring', 'Frame rings keep the body round, like hoops hold a barrel together.'],
+  ['Load beam 1', 'Load beams spread the engines’ thrust through the whole body so the rocket doesn’t bend in flight.'],
+  ['Load beam 2', 'Engineers look for balance: a rocket must be strong, but every extra kilogram needs more fuel.'],
+  ['Load beam 3', 'Many modern rockets have parts made of carbon fibre. It is lighter than steel and very strong.'],
+  ['Load beam 4', 'During launch, g-forces act on the rocket: everything on board feels several times heavier.'],
+  ['Middle frame ring', 'A rocket body is often assembled from sections joined by rings, like a construction set.'],
+  ['Diagonal brace 1', 'Braces form triangles. A triangle is the hardest shape to push out of shape, so it makes a structure stiff.'],
+  ['Diagonal brace 2', 'Triangle trusses are used in bridges, TV towers and on the International Space Station.'],
+  ['Engine mount', 'The engine mount carries the full thrust of the engines, the force that pushes the rocket up.'],
+  ['Upper frame ring', 'The tanks sit on the upper ring, so it must hold their weight together with the fuel.'],
+  ['Frame lock', 'Locks join the parts of a rocket. On real rockets they can open in flight to drop an empty stage.'],
+  ['Nozzle 1', 'The nozzle points hot gases downward, and the rocket flies up. This is Newton’s third law: every action has an equal and opposite reaction.'],
+  ['Nozzle 2', 'A nozzle is bell-shaped: the gases expand and leave even faster, giving the rocket more thrust.'],
+  ['Nozzle 3', 'Gases leave the nozzle at more than 3 kilometres per second. That’s faster than a bullet.'],
+  ['Combustion chamber 1', 'In the combustion chamber, fuel mixes with oxidiser and burns at about 3000 °C.'],
+  ['Combustion chamber 2', 'The chamber walls are cooled by the fuel itself: it flows through channels inside the walls before it burns.'],
+  ['Combustion chamber 3', 'There is no air in space, so a rocket carries its own oxidiser. Without it, fuel can’t burn.'],
+  ['Turbopump', 'A turbopump pushes hundreds of litres of fuel into the engine every second. Its turbine spins tens of thousands of times a minute.'],
+  ['Fuel tank, lower section', 'Fuel makes up more than 80 percent of a rocket’s mass at launch. The rocket itself is light by comparison.'],
+  ['Fuel tank, upper section', 'Tanks have very thin walls. Some keep their shape thanks to gas pressure inside, like a balloon.'],
+  ['Oxidiser tank', 'The usual oxidiser is liquid oxygen. To stay liquid, it is cooled to minus 183 °C.'],
+  ['Fuel line 1', 'Fuel lines are pipes that carry fuel from the tanks to the engine.'],
+  ['Fuel line 2', 'Pipes are made flexible at the joints because a rocket shakes hard in flight.'],
+  ['Oxidiser line', 'The oxidiser line is insulated so the super-cold oxygen doesn’t warm up and boil.'],
+  ['Feed valve', 'Valves open and close the flow of fuel. That’s how an engine is started, stopped and throttled.'],
+  ['Pressure regulator', 'The pressure regulator keeps tank pressure just right: not too high and not too low.'],
+  ['Tank insulation', 'The orange colour of the Space Shuttle’s big tank was the colour of its insulating foam.'],
+  ['Gimbal mount', 'A gimbal lets the engine tilt. That’s how a rocket steers, like pointing a torch in different directions.'],
+  ['Thrust vector actuator', 'The actuator tilts the engine on the computer’s command so the rocket flies straight and doesn’t tip over.'],
+  ['Igniter', 'The igniter lights the fuel and oxidiser in the combustion chamber, like the spark of a lighter.'],
+  ['Engine power unit', 'The power unit supplies electricity to the engine valves, sensors and actuators.'],
+  ['Flight computer', 'The Apollo spacecraft computer had about 4 kilobytes of working memory. That’s millions of times less than a modern smartphone.'],
+  ['Backup computer', 'Important systems in space are duplicated. If the main computer fails, the backup takes over.'],
+  ['Navigation chip', 'The navigation chip keeps calculating where the rocket is, where it is going and how fast.'],
+  ['Radio chip', 'A radio signal from the Moon reaches Earth in about 1.3 seconds.'],
+  ['Gyroscope', 'A gyroscope senses turns and tilts. There is a tiny gyroscope in your phone too.'],
+  ['Accelerometer', 'An accelerometer measures acceleration. From its data, the computer works out the rocket’s speed.'],
+  ['Star tracker', 'A star tracker photographs the stars and compares them with a sky map. That’s how a spacecraft knows exactly which way it is facing.'],
+  ['Radar altimeter', 'Radar sends radio waves to the surface and catches their echo. The travel time tells it the altitude.'],
+  ['Lidar', 'Lidar works like radar but uses laser light instead of radio waves. It builds a 3D map of the terrain.'],
+  ['Sun sensor', 'The sun sensor finds the Sun so the spacecraft and its solar panels can turn the right way.'],
+  ['Antenna', 'Signals from distant spacecraft are caught by huge antennas on Earth up to 70 metres across.'],
+  ['Transmitter', 'A transmitter turns data into radio waves. The Voyager 1 probe has sent signals from more than 20 billion kilometres away.'],
+  ['Temperature sensor', 'On the Moon it can be over +120 °C by day and below −170 °C at night. Sensors make sure instruments don’t overheat or freeze.'],
+  ['Pressure sensor', 'Pressure sensors watch the tanks and the cabin. A sudden drop in pressure can mean a leak.'],
+  ['Hull neon sensors', 'Indicator lights show the state of systems: green means all is well, red warns of a problem.'],
+  ['Data bus', 'A data bus is the “road” that instruments use to exchange information with the computer.'],
+  ['Memory unit', 'Memory for space is protected from radiation, because space particles can accidentally change data.'],
+  ['Power controller', 'The power controller decides how much electricity each device gets and switches off extras to save charge.'],
+  ['Instrument panel', 'On the instrument panel the pilot sees speed, altitude, fuel left and the state of every system.'],
+  ['Autopilot module', 'Modern rockets fly on autopilot from launch to orbit. People just watch the flight.'],
+  ['Oxygen tank 1', 'A person breathes in about 0.8 kilograms of oxygen a day, so oxygen on board is counted very carefully.'],
+  ['Oxygen tank 2', 'Oxygen is stored under high pressure so lots of gas fits into a small space.'],
+  ['Oxygen tank 3', 'On the International Space Station, oxygen is made from water using electricity. This process is called electrolysis.'],
+  ['CO₂ filter', 'When we breathe out, we release carbon dioxide. The filter absorbs it so the cabin air stays breathable.'],
+  ['Air regenerator', 'The regenerator cleans the air so it can be used again and again.'],
+  ['Solar panel, left', 'Solar panels turn light into electricity. There are no clouds in space, so sunlight reaches them all the time.'],
+  ['Solar panel, right', 'With its solar panels, the International Space Station is more than 100 metres wide, longer than a football pitch.'],
+  ['Panel deploy drive', 'During launch the panels are folded like a fan. In space, the drive unfolds them.'],
+  ['Battery', 'The battery stores energy so the spacecraft has power when it passes into the shadow of the Moon or Earth.'],
+  ['Heat shield tile 1', 'When a spacecraft returns to Earth, it slams into the atmosphere and its skin heats up to more than 1500 °C.'],
+  ['Heat shield tile 2', 'Space Shuttle tiles conducted heat so poorly that a red-hot tile could be held by its edges with bare hands.'],
+  ['Heat shield tile 3', 'Some heat shields slowly burn away and carry the heat off with them. They are called ablative shields.'],
+  ['Heat shield tile 4', 'When entering the atmosphere, a spacecraft turns shield-first to slow down without burning up.'],
+  ['Cabin window', 'A cabin window has several layers of glass to withstand the pressure difference and hits from tiny particles.'],
+  ['Cabin hatch', 'The hatch must open quickly on the ground but seal completely airtight in flight.'],
+  ['Hatch seal', 'A seal is a flexible ring that keeps air inside the cabin even when there is vacuum outside.'],
+  ['Pilot seat', 'Astronaut seats are shaped to the body so the g-forces of launch are easier to bear.'],
+  ['Heating system', 'It is very cold in the Moon’s shadow. Without heating, instruments and people would quickly freeze.'],
+  ['Water tank', 'On a space station most water is cleaned and reused, even moisture from the air.'],
+  ['First aid kit', 'A space first aid kit has medicine for headaches, nausea and sleeplessness, because weightlessness affects how you feel.'],
+  ['Fuel crystal No. 1', 'In our game the rocket runs on Moon crystals. Real rockets use kerosene, liquid hydrogen or methane together with liquid oxygen.'],
+  ['Fuel crystal No. 2', 'Liquid hydrogen is the lightest rocket fuel. To keep it from boiling, it is stored at minus 253 °C.'],
+  ['Fuel crystal No. 3', 'Water ice has been found in dark craters near the Moon’s poles. In the future it could be turned into fuel and oxygen.'],
+  ['Fuel crystal No. 4', 'Solid rocket fuel feels a bit like rubber. It is used in side boosters.'],
+  ['Fuel crystal No. 5', 'To leave Earth for good, a rocket must reach about 11.2 kilometres per second.'],
+  ['Fuel crystal No. 6', 'To leave the Moon, about 2.4 kilometres per second is enough, because the Moon is much lighter than Earth.'],
+  ['Fuel crystal No. 7', 'To reach orbit around Earth, you need a speed of about 7.9 kilometres per second.'],
+  ['Fuel crystal No. 8', 'Rockets are built in stages. Empty tanks are dropped so the rocket doesn’t carry extra weight.'],
+  ['Fuel crystal No. 9', 'The Saturn V rocket that sent people to the Moon was 110 metres tall, as tall as a 36-storey building.'],
+  ['Fuel crystal No. 10', 'The Apollo flight from Earth to the Moon took about three days.'],
+  ['Fuel crystal No. 11', 'On average, the Moon is 384,000 kilometres from Earth.'],
+  ['Fuel crystal No. 12', 'Neil Armstrong and Buzz Aldrin became the first people on the Moon in 1969.'],
+  ['Fuel crystal No. 13', 'The Moon has no wind or atmosphere, so astronauts’ footprints can last for millions of years.'],
+  ['Fuel crystal No. 14', 'Ukrainian engineer Yuri Kondratyuk described a way to fly to the Moon in the early 20th century. The Apollo program later used this idea.'],
+  ['Fuel crystal No. 15', 'Serhii Korolov (Sergei Korolev), born in Zhytomyr, was the chief designer of the first satellite and of Yuri Gagarin’s spacecraft.'],
+  ['Fuel crystal No. 16', 'The first artificial satellite was launched in 1957. It weighed only 83.6 kilograms.'],
+  ['Crystal purifier', 'Fuel is cleaned of impurities, because even a tiny speck of dust can clog an engine injector.'],
+  ['Nose fairing', 'The fairing is pointed so the rocket cuts through the air more easily. Once the rocket leaves the atmosphere, it is dropped.'],
+  ['Launch system', 'Before launch, thousands of sensors check the rocket. If something is wrong, the computer stops the launch even a second before liftoff.'],
+  ['Launch key', 'Every part is in place! From the first leg to the launch key, you have built a real rocket. Time to fly home.'],
+];
+const partName = n => LANG === 'en' ? PARTS_EN[n - 1][0] : PARTS[n - 1][0];
+const partFact = n => LANG === 'en' ? PARTS_EN[n - 1][1] : PARTS[n - 1][2];
+const TUTORIAL = { 1: ['F', 'F', 'F'], 2: ['F', 'F', 'R', 'F', 'F'], 3: ['F', 'L', 'F', 'F', 'R', 'F'], 4: ['F', 'R', 'F', 'F', 'L', 'F', 'F'] };
+const CAP = { main: 14, F1: 7, F2: 7 };
+
+function cfgFor(n) {
+  const s = Math.ceil(n / 20), k = (n - 1) % 20, d = k / 19;
+  if (s === 1) return { s, k, funcs: 0, jump: n >= 11, wait: false, mainLen: [Math.min(10, 3 + Math.floor(d * 7)), Math.min(12, 4 + Math.floor(d * 8))], picks: 1 + (k >= 6) + (k >= 14), slack: k < 6 ? 3 : k < 14 ? 2 : 1, cracked: 0, hazards: 0, crater: n <= 3 ? 0 : .16 + .2 * d, rock: n <= 3 ? 0 : .08, minMoves: k < 4 ? 3 : 4 + Math.floor(d * 4), maxW: 7 };
+  if (s === 2) return { s, k, funcs: 1, jump: true, wait: false, f1Len: [3, 4 + (k > 8 ? 1 : 0)], calls: [2, 3 + (k > 10 ? 1 : 0)], extra: [0, 1 + (k > 12 ? 1 : 0)], picks: 2 + (k >= 10 ? 1 : 0), slack: k < 8 ? 2 : 1, cracked: .45, hazards: 0, crater: .24, rock: .1, minMoves: 6, maxW: 7 };
+  if (s === 3) return { s, k, funcs: 1, jump: true, wait: true, f1Len: [3, 5], calls: [2, 4], extra: [1, 2], picks: 2 + (k >= 10 ? 1 : 0), slack: k < 8 ? 2 : 1, cracked: .3, hazards: 1 + Math.floor(d * 3), crater: .24, rock: .1, minMoves: 6, maxW: 7 };
+  if (s === 4) return { s, k, funcs: 2, jump: true, wait: true, f1Len: [3, 5], f2Len: [2, 4], calls: [2, 4], extra: [0, 2], picks: 3 + (k >= 10 ? 1 : 0), slack: 1, cracked: .3, hazards: 1 + Math.floor(d * 2), crater: .28, rock: .12, minMoves: 8, maxW: 7 };
+  return { s, k, funcs: 2, jump: true, wait: true, f1Len: [4, 6], f2Len: [3, 5], calls: [2, 4], extra: [0, 2], picks: 3 + (k >= 10 ? 1 : 0), slack: k < 6 ? 1 : 0, cracked: .4, hazards: 2 + Math.floor(d * 3), crater: .3, rock: .12, minMoves: 9, maxW: 7 };
+}
+function pick(r, cfg) { const x = r(); if (x < .44) return 'F'; if (x < .58) return cfg.jump ? 'J' : 'F'; if (x < .74) return 'L'; if (x < .9) return 'R'; return cfg.wait ? 'W' : 'F'; }
+function randBody(r, len, cfg) {
+  const out = []; let g = 0;
+  while (out.length < len && g++ < 300) {
+    const c = pick(r, cfg), p = out[out.length - 1], q = out[out.length - 2];
+    if ((c === 'L' && p === 'R') || (c === 'R' && p === 'L')) continue;
+    if ((c === 'L' || c === 'R') && p === c && q === c) continue;
+    if (c === 'W' && p === 'W') continue;
+    out.push(c);
+  }
+  if (!out.some(c => c === 'F' || c === 'J')) out[0] = 'F';
+  return out;
+}
+function genProgram(r, cfg) {
+  if (cfg.funcs === 0) return { main: randBody(r, ri(r, ...cfg.mainLen), cfg), F1: [], F2: [] };
+  const F2 = cfg.funcs === 2 ? randBody(r, ri(r, ...cfg.f2Len), cfg) : [];
+  let F1 = randBody(r, ri(r, ...cfg.f1Len), cfg);
+  if (cfg.funcs === 2 && r() < .6) { F1 = randBody(r, Math.max(2, F1.length - 1), cfg); F1.splice(ri(r, 0, F1.length), 0, 'F2'); }
+  const calls = ri(r, ...cfg.calls), extra = ri(r, ...cfg.extra), main = [];
+  for (let i = 0; i < calls; i++) main.push(cfg.funcs === 2 && i > 0 && r() < .35 ? 'F2' : 'F1');
+  for (let i = 0; i < extra; i++) main.splice(ri(r, 0, main.length), 0, pick(r, cfg));
+  if (cfg.funcs === 2 && !main.includes('F2') && !F1.includes('F2')) main.splice(ri(r, 1, main.length), 0, 'F2');
+  return { main, F1, F2 };
+}
+function flatten(prog) {
+  const out = [];
+  const ex = (row, depth) => { if (depth > 3) return; for (const c of prog[row]) { if (c === 'F1' || c === 'F2') ex(c, depth + 1); else out.push(c); } };
+  ex('main', 0); return out;
+}
+function simulateGen(prog, r, startDir) {
+  const seq = flatten(prog); if (seq.length > 90 || seq.length < 2) return null;
+  let x = 0, z = 0, d = startDir, h = 0, t = 0, moves = 0, prev = null, prev2 = null;
+  const cells = new Map(); cells.set(K(0, 0), { x: 0, z: 0, h: 0, arr: 1, occ: [] });
+  for (const c of seq) {
+    if ((c === 'L' && prev === 'R') || (c === 'R' && prev === 'L')) return null;
+    if ((c === 'L' || c === 'R') && prev === c && prev2 === c) return null;
+    if (c === 'F' || c === 'J') {
+      const nx = x + DIRS[d][0], nz = z + DIRS[d][1], k = K(nx, nz); let cell = cells.get(k);
+      if (c === 'F') { if (cell) { if (cell.h !== h) return null; } else { cell = { x: nx, z: nz, h, arr: 0, occ: [] }; cells.set(k, cell); } }
+      else {
+        if (cell) { if (Math.abs(cell.h - h) !== 1) return null; }
+        else { const o = []; if (h < 3) o.push(h + 1); if (h > 0) o.push(h - 1); cell = { x: nx, z: nz, h: o[Math.floor(r() * o.length)], arr: 0, occ: [] }; cells.set(k, cell); }
+      }
+      x = nx; z = nz; h = cell.h; cell.arr++; moves++;
+    } else if (c === 'L') d = (d + 3) % 4; else if (c === 'R') d = (d + 1) % 4;
+    t++; cells.get(K(x, z)).occ.push(t);
+    prev2 = prev; prev = c;
+  }
+  if (prev !== 'F' && prev !== 'J') return null;
+  return { cells, end: K(x, z), moves, seq };
+}
+function buildLevel(n) {
+  const base = cfgFor(n), r = rng(n * 7919 + 13);
+  for (let attempt = 0; attempt < 20000; attempt++) {
+    const cfg = attempt < 12000 ? base : { ...base, minMoves: 3, slack: base.slack + 1 };
+    const tut = TUTORIAL[n];
+    const prog = tut ? { main: tut.slice(), F1: [], F2: [] } : genProgram(r, cfg);
+    const startDir = tut ? 0 : ri(r, 0, 3);
+    const sim = simulateGen(prog, r, startDir); if (!sim) continue;
+    if (!tut && sim.moves < cfg.minMoves) continue;
+    if (sim.end === K(0, 0) || sim.cells.size < 3) continue;
+    let mnx = 1e9, mxx = -1e9, mnz = 1e9, mxz = -1e9;
+    for (const c of sim.cells.values()) { mnx = Math.min(mnx, c.x); mxx = Math.max(mxx, c.x); mnz = Math.min(mnz, c.z); mxz = Math.max(mxz, c.z); }
+    if (mxx - mnx + 1 > cfg.maxW || mxz - mnz + 1 > cfg.maxW) continue;
+    const lim = { main: prog.main.length + cfg.slack, F1: cfg.funcs >= 1 ? prog.F1.length + cfg.slack : 0, F2: cfg.funcs >= 2 ? prog.F2.length + cfg.slack : 0 };
+    lim.main = Math.min(lim.main, CAP.main); lim.F1 = Math.min(lim.F1, CAP.F1); lim.F2 = Math.min(lim.F2, CAP.F2);
+    if (prog.main.length > lim.main || prog.F1.length > lim.F1 || prog.F2.length > lim.F2) continue;
+    if (cfg.funcs >= 1 && sim.seq.length < lim.main + 2) continue;
+    if (cfg.funcs >= 1 && !prog.main.includes('F1')) continue;
+    // assemble the board
+    const ox = 1 - mnx, oz = 1 - mnz, W = mxx - mnx + 3, D = mxz - mnz + 3;
+    const cells = new Map();
+    const startK = K(ox, oz);
+    for (const c of sim.cells.values()) cells.set(K(c.x + ox, c.z + oz), { x: c.x + ox, z: c.z + oz, h: c.h, type: 'ground', occ: c.occ, arr: c.arr, path: true });
+    cells.get(startK).type = 'start';
+    const endK = (() => { const [a, b] = sim.end.split(',').map(Number); return K(a + ox, b + oz); })();
+    const cand = [...cells.keys()].filter(k => k !== startK && k !== endK);
+    shuffle(r, cand);
+    const pickups = [endK, ...cand.slice(0, Math.max(0, cfg.picks - 1))];
+    if (cfg.cracked) for (const k of cells.keys()) { const c = cells.get(k); if (k !== startK && c.arr === 1 && r() < cfg.cracked) c.type = 'cracked'; }
+    let hz = 0;
+    if (cfg.hazards) {
+      const hc = shuffle(r, [...cells.keys()].filter(k => cells.get(k).type === 'ground'));
+      for (const k of hc) {
+        if (hz >= cfg.hazards) break;
+        const c = cells.get(k), p = r() < .5 ? 2 : 3;
+        const phs = shuffle(r, [...Array(p).keys()]);
+        const ph = phs.find(ph => c.occ.every(t => (t + ph) % p !== 0));
+        if (ph === undefined) continue;
+        c.type = r() < .5 ? 'unstable' : 'radiation'; c.p = p; c.ph = ph; hz++;
+      }
+      if (hz === 0) continue;
+    }
+    let maxH = 0; for (const c of cells.values()) maxH = Math.max(maxH, c.h);
+    for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
+      const k = K(x, z); if (cells.has(k)) continue;
+      const edge = x === 0 || z === 0 || x === W - 1 || z === D - 1;
+      if (cfg.s >= 2 && edge && r() < .3) continue;
+      const v = r();
+      const type = v < cfg.crater ? 'crater' : v < cfg.crater + cfg.rock ? 'rock' : 'ground';
+      cells.set(k, { x, z, h: maxH ? ri(r, 0, maxH) : 0, type, path: false });
+    }
+    for (const c of cells.values()) { delete c.occ; delete c.arr; }
+    const cmds = ['F', 'L', 'R'];
+    if (cfg.jump) cmds.push('J'); if (cfg.wait) cmds.push('W'); if (cfg.funcs >= 1) cmds.push('F1'); if (cfg.funcs >= 2) cmds.push('F2');
+    return { n, stage: cfg.s, w: W, d: D, cells, start: { x: ox, z: oz, dir: startDir }, pickups, limits: lim, cmds,
+      optimal: prog.main.length + prog.F1.length + prog.F2.length, solution: prog };
+  }
+  throw new Error('level ' + n + ' failed');
+}
+// Rules engine: one command = one tick; hazards checked after each command.
+function newRun(level) { const c = level.cells.get(K(level.start.x, level.start.z)); return { x: level.start.x, z: level.start.z, dir: level.start.dir, h: c.h, t: 0, broken: new Set(), got: new Set() }; }
+const danger = (cell, t) => !!cell && !!cell.p && (t + cell.ph) % cell.p === 0;
+function step(level, st, cmd) {
+  const res = { cmd, from: { x: st.x, z: st.z, h: st.h, dir: st.dir }, fail: null, broke: null, got: null };
+  if (cmd === 'L') st.dir = (st.dir + 3) % 4;
+  else if (cmd === 'R') st.dir = (st.dir + 1) % 4;
+  else if (cmd === 'F' || cmd === 'J') {
+    const nx = st.x + DIRS[st.dir][0], nz = st.z + DIRS[st.dir][1], k = K(nx, nz), cell = level.cells.get(k);
+    const tgt = { x: nx, z: nz, h: cell ? cell.h : st.h, dir: st.dir };
+    const bad = type => { res.to = tgt; res.fail = { type }; return res; };
+    if (!cell) return bad('void');
+    if (cell.type === 'rock') return bad('rock');
+    if (cell.type === 'crater') return bad('crater');
+    if (st.broken.has(k)) return bad('broken');
+    const dh = cell.h - st.h;
+    if (cmd === 'F' && dh !== 0) return bad(dh > 0 ? 'wall' : 'ledge');
+    if (cmd === 'J' && Math.abs(dh) !== 1) return bad('jump');
+    const ck = K(st.x, st.z), cur = level.cells.get(ck);
+    if (cur && cur.type === 'cracked') { st.broken.add(ck); res.broke = ck; }
+    st.x = nx; st.z = nz; st.h = cell.h;
+  }
+  st.t++;
+  res.to = { x: st.x, z: st.z, h: st.h, dir: st.dir }; res.t = st.t;
+  const k = K(st.x, st.z), c = level.cells.get(k);
+  if (danger(c, st.t)) { res.fail = { type: c.type === 'unstable' ? 'plate' : 'radiation' }; return res; }
+  if (level.pickups.includes(k) && !st.got.has(k)) { st.got.add(k); res.got = k; }
+  return res;
+}
+//#LOGIC-END
+
+const FAIL_UK = {
+  void: 'Космонавт ступив за край плато. Перевір повороти й кількість кроків.',
+  crater: 'Космонавт провалився в кратер. Обійди його іншим маршрутом.',
+  rock: 'Шлях перегороджує валун. Знайди обхід.',
+  broken: 'Ця плита вже зруйнована. Тріснуті плити витримують лише один прохід.',
+  wall: 'Попереду сходинка вгору. Тут потрібен «Стрибок».',
+  ledge: 'Попереду уступ униз. Тут потрібен «Стрибок».',
+  jump: 'Стрибок працює лише на сусідню плиту, вищу або нижчу на один рівень.',
+  plate: 'Хитка плита провалилася саме в цей такт. Зміни час проходу командою «Чекати».',
+  radiation: 'Космонавт потрапив під радіаційний імпульс. Стеж за індикатором циклу біля плити.',
+};
+const HINTS_UK = {
+  1: 'Торкнись <b>Вперед</b> тричі, щоб скласти програму, а потім натисни <b>Запуск</b>. Деталь чекає на світному кільці.',
+  2: 'Поворот змінює напрям, але не переміщує космонавта. Помилкову команду прибирають дотиком до неї в програмі.',
+  5: 'Кратери й валуни непрохідні. Обходь їх. Камеру можна повертати пальцем.',
+  7: 'На рівні кілька деталей. Програма має зібрати їх усі.',
+  11: 'Новий блок <b>Стрибок</b>: космонавт перестрибує на плиту, вищу або нижчу на один рівень.',
+  21: 'Відкрито <b>F1</b>! Торкнись рядка F1, склади в ньому повторюваний шматок маршруту й виклич F1 з основної програми.',
+  22: '<b>Тріснуті плити</b> руйнуються, щойно космонавт з них сходить. Другого проходу не буде.',
+  41: '<b>Хиткі плити</b> й <b>радіація</b> змінюються щотакту. Крапки біля плити показують наступні такти: червона означає небезпеку. <b>Чекати</b> пропускає один такт.',
+  61: 'Тепер є <b>F2</b>. Функція F1 може викликати F2, а основна програма будь-яку з них.',
+  81: 'Фінальний етап. Ліміти мінімальні, тож кожна команда має бути на своєму місці.',
+};
+const FAIL_EN = {
+  void: 'The astronaut stepped off the edge of the plateau. Check your turns and the number of steps.',
+  crater: 'The astronaut fell into a crater. Find another route around it.',
+  rock: 'A boulder blocks the way. Find a way around it.',
+  broken: 'This plate has already collapsed. Cracked plates only hold for one crossing.',
+  wall: 'There is a step up ahead. You need Jump here.',
+  ledge: 'There is a step down ahead. You need Jump here.',
+  jump: 'Jump only works onto a neighbouring plate one level higher or lower.',
+  plate: 'The wobbly plate dropped on exactly this tick. Change your timing with Wait.',
+  radiation: 'The astronaut was hit by a radiation pulse. Watch the cycle lights next to the plate.',
+};
+const HINTS_EN = {
+  1: 'Tap <b>Forward</b> three times to build a program, then press <b>Run</b>. The part is waiting on the glowing ring.',
+  2: 'A turn changes direction but doesn’t move the astronaut. Tap a command in the program to remove it.',
+  5: 'Craters and boulders block the way, so go around them. You can rotate the camera with your finger.',
+  7: 'This level has several parts. Your program must collect them all.',
+  11: 'New block: <b>Jump</b>. The astronaut jumps onto a plate one level higher or lower.',
+  21: '<b>F1</b> is unlocked! Tap the F1 row, put a repeating piece of the route in it, and call F1 from the main program.',
+  22: '<b>Cracked plates</b> collapse as soon as the astronaut steps off. There is no second crossing.',
+  41: '<b>Wobbly plates</b> and <b>radiation</b> change every tick. The lights next to a plate show the next ticks: red means danger. <b>Wait</b> skips one tick.',
+  61: 'Now you have <b>F2</b>. F1 can call F2, and the main program can call either of them.',
+  81: 'Final stage. The limits are tight, so every command has to count.',
+};
+const FAIL = () => LANG === 'en' ? FAIL_EN : FAIL_UK;
+const HINT = n => (LANG === 'en' ? HINTS_EN : HINTS_UK)[n];
+const CMD_NAMES = {
+  uk: { F: 'Вперед', L: 'Поворот ліворуч', R: 'Поворот праворуч', J: 'Стрибок', W: 'Чекати', F1: 'Виклик F1', F2: 'Виклик F2' },
+  en: { F: 'Forward', L: 'Turn left', R: 'Turn right', J: 'Jump', W: 'Wait', F1: 'Call F1', F2: 'Call F2' },
+};
+const cmdName = c => CMD_NAMES[LANG][c];
+const I18N = {
+  uk: {
+    title: 'Код повернення', h1: 'Код <em>повернення</em>', menuAria: 'До меню рівнів', level: 'Рівень', tick: 'Такт', gotIt: 'Зрозуміло', programAria: 'Програма космонавта', clear: 'Очистити',
+    eyebrow: 'Море Спокою · Позивний Інженер-01', lede: 'Космонавт застряг на Місяці. Програмуй його маршрут, збери 100 деталей нової ракети й поверни його на Землю.',
+    saved: 'Прогрес зберігається в цьому браузері', reset: 'Скинути прогрес', loadingH: 'Збираємо Місяць', loadingP: 'Генеруємо реголіт і зоряне небо…',
+    noWebgl: 'Цей браузер не підтримує WebGL, тому 3D-сцена не запуститься.', bootFail: 'Не вдалося запустити 3D-сцену: ',
+    seeking: p => `Шукаємо: ${p}`, mainLabel: 'ОСН', editMain: 'Редагувати основну програму', editFn: f => 'Редагувати функцію ' + f, remove: ', прибрати', emptySlot: 'Порожня комірка',
+    stop: 'Стоп', run: 'Запуск', emptyProg: 'Спершу додай команди в основну програму. Торкайся кнопок унизу.',
+    incomplete: (a, b) => `Програма завершилась, а зібрано ${a} з ${b} ${b === 1 ? 'деталі' : 'деталей'}. Допиши маршрут.`,
+    failEyebrow: t => `Збій маршруту · такт ${t}`, tryAgain: 'Спробуй ще раз', backToProgram: 'До програми',
+    stageReward: n => `Нагорода етапу ${n}`, levelDone: n => `Рівень ${n} пройдено`, partInBag: 'Деталь у кошику', didYouKnow: 'Чи знаєш ти?',
+    stat: (u, o) => `Команд у програмі: ${u} · найкоротше відоме рішення: ${o}`, menu: 'Меню', replay: 'Повторити', next: 'Далі',
+    capStage: (s, name) => `Етап ${s} · ${name}`, capFlying: 'Деталі збираються до ракети…', capPart: (s, i) => `Етап ${s} · деталь ${i} з 20`, capDone: s => `Етап ${s} зібрано!`,
+    liftoff: 'Старт!', finEyebrow: 'Місію виконано · 100 / 100 деталей', finH: 'Курс на Землю',
+    finP: 'Усі запчастини на місці. Двигуни на кристалах-паливі вивели ракету з поверхні Місяця, і космонавт повертається додому.',
+    summary: 'Підсумок', starsTotal: x => `Зірок зібрано: ${x} з 300`, toMenu: 'До меню',
+    levelIntro: p => `Деталь цього рівня: <b>${p}</b>. Збери всі її частини, щоб дізнатися, навіщо вона ракеті.`,
+    partsCount: d => `<b>${d}</b> / 100 деталей`, watchLaunch: 'Переглянути запуск ще раз', cont: n => `Продовжити · Рівень ${n}`, startMission: 'Почати місію',
+    stage: 'Етап', goal: 'Мета', gameplay: 'Геймплей', reward: 'Нагорода', showAssembly: 'Показати збирання етапу',
+    lvDone: d => `, пройдено, зірок ${d}`, lvLocked: ', закрито', resetQ: 'Скинути прогрес?', resetP: 'Усі пройдені рівні, зірки й зібрані деталі ракети буде видалено з цього браузера.',
+    cancel: 'Скасувати', resetBtn: 'Скинути', langAria: 'Мова гри',
+  },
+  en: {
+    title: 'Return Code', h1: 'Return <em>Code</em>', menuAria: 'Level menu', level: 'Level', tick: 'Tick', gotIt: 'Got it', programAria: 'Astronaut’s program', clear: 'Clear',
+    eyebrow: 'Sea of Tranquility · Call sign Engineer-01', lede: 'An astronaut is stranded on the Moon. Program the route, collect 100 parts for a new rocket and bring the astronaut back to Earth.',
+    saved: 'Progress is saved in this browser', reset: 'Reset progress', loadingH: 'Building the Moon', loadingP: 'Generating regolith and a starry sky…',
+    noWebgl: 'This browser doesn’t support WebGL, so the 3D scene can’t start.', bootFail: 'The 3D scene couldn’t start: ',
+    seeking: p => `Looking for: ${p}`, mainLabel: 'MAIN', editMain: 'Edit the main program', editFn: f => 'Edit function ' + f, remove: ', remove', emptySlot: 'Empty slot',
+    stop: 'Stop', run: 'Run', emptyProg: 'First add commands to the main program. Tap the buttons below.',
+    incomplete: (a, b) => `The program ended with ${a} of ${b} ${b === 1 ? 'part' : 'parts'} collected. Extend the route.`,
+    failEyebrow: t => `Route failed · tick ${t}`, tryAgain: 'Try again', backToProgram: 'Back to program',
+    stageReward: n => `Stage ${n} reward`, levelDone: n => `Level ${n} complete`, partInBag: 'Part collected', didYouKnow: 'Did you know?',
+    stat: (u, o) => `Commands in your program: ${u} · shortest known solution: ${o}`, menu: 'Menu', replay: 'Replay', next: 'Next',
+    capStage: (s, name) => `Stage ${s} · ${name}`, capFlying: 'The parts are flying to the rocket…', capPart: (s, i) => `Stage ${s} · part ${i} of 20`, capDone: s => `Stage ${s} complete!`,
+    liftoff: 'Liftoff!', finEyebrow: 'Mission complete · 100 / 100 parts', finH: 'Heading for Earth',
+    finP: 'Every part is in place. Engines running on fuel crystals lifted the rocket off the Moon, and the astronaut is on the way home.',
+    summary: 'Summary', starsTotal: x => `Stars earned: ${x} of 300`, toMenu: 'Back to menu',
+    levelIntro: p => `This level’s part: <b>${p}</b>. Collect all its pieces to find out why the rocket needs it.`,
+    partsCount: d => `<b>${d}</b> / 100 parts`, watchLaunch: 'Watch the launch again', cont: n => `Continue · Level ${n}`, startMission: 'Start mission',
+    stage: 'Stage', goal: 'Goal', gameplay: 'Gameplay', reward: 'Reward', showAssembly: 'Show stage assembly',
+    lvDone: d => `, completed, ${d} stars`, lvLocked: ', locked', resetQ: 'Reset progress?', resetP: 'All completed levels, stars and collected rocket parts will be deleted from this browser.',
+    cancel: 'Cancel', resetBtn: 'Reset', langAria: 'Game language',
+  },
+};
+const t = (k, ...a) => { const v = I18N[LANG][k]; return typeof v === 'function' ? v(...a) : v; };
+const CMD = {
+  F: { c: '#62e3ff', svg: '<path d="M12 19V5M6 11l6-6 6 6"/>' },
+  L: { c: '#ffb547', svg: '<path d="M9 14 4 9l5-5"/><path d="M4 9h9a6 6 0 0 1 6 6v4"/>' },
+  R: { c: '#ffb547', svg: '<path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0-6 6v4"/>' },
+  J: { c: '#b590ff', svg: '<path d="M4 20h4M16 20h4"/><path d="M6 17C7 7 17 7 18 17"/><path d="m14.5 14.5 3.5 2.6 2-3.9"/>' },
+  W: { c: '#9aa7bd', svg: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>' },
+  F1: { c: '#6ee7a8', txt: 'F1' },
+  F2: { c: '#ff8ac6', txt: 'F2' },
+};
+const icon = c => CMD[c].txt ? `<span class="fn">${CMD[c].txt}</span>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${CMD[c].svg}</svg>`;
+
+/* ---------------- storage ---------------- */
+const SAVE_KEY = 'moon-builder-v1';
+let save = { done: {}, drafts: {} };
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.done) save = { done: s.done, drafts: s.drafts || {} }; } catch (e) { }
+try { const l = localStorage.getItem('moon-builder-lang'); if (l === 'en' || l === 'uk') LANG = l; } catch (e) { }
+function applyStatic() {
+  document.documentElement.lang = LANG; document.title = t('title');
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+  document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
+  document.querySelectorAll('.lang [data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === LANG)));
+  document.querySelectorAll('[data-langtoggle] .lt').forEach(el => el.textContent = LANG === 'uk' ? 'EN' : 'УК');
+}
+function setLang(l) {
+  if (l === LANG) return; LANG = l;
+  try { localStorage.setItem('moon-builder-lang', l); } catch (e) { }
+  applyStatic();
+  if (screen === 'menu') renderMenu();
+  if (level && screen === 'game') { hud(); renderProgram(); if (!$('toast').hidden) toast(HINT(level.n) || t('levelIntro', partName(level.n))); }
+}
+document.querySelectorAll('.lang [data-lang]').forEach(b => b.onclick = () => setLang(b.dataset.lang));
+document.querySelectorAll('[data-langtoggle]').forEach(b => b.onclick = () => setLang(LANG === 'uk' ? 'en' : 'uk'));
+applyStatic();
+const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { } };
+const doneCount = () => Object.keys(save.done).length;
+const unlocked = n => n === 1 || !!save.done[n - 1];
+const nextLevel = () => { for (let n = 1; n <= 100; n++) if (!save.done[n]) return n; return 100; };
+const stageProgress = s => { let c = 0; for (let n = s * 20 + 1; n <= s * 20 + 20; n++) if (save.done[n]) c++; return c / 20; };
+
+/* ---------------- noise & procedural textures ---------------- */
+function hash3(x, y, z) { let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(z | 0, 1274126177)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
+const sm = t => t * t * (3 - 2 * t);
+function vnoise3(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), u = sm(x - xi), v = sm(y - yi), w = sm(z - zi);
+  const c = (a, b, d) => hash3(xi + a, yi + b, zi + d);
+  const x00 = c(0, 0, 0) + (c(1, 0, 0) - c(0, 0, 0)) * u, x10 = c(0, 1, 0) + (c(1, 1, 0) - c(0, 1, 0)) * u;
+  const x01 = c(0, 0, 1) + (c(1, 0, 1) - c(0, 0, 1)) * u, x11 = c(0, 1, 1) + (c(1, 1, 1) - c(0, 1, 1)) * u;
+  const y0 = x00 + (x10 - x00) * v, y1 = x01 + (x11 - x01) * v; return y0 + (y1 - y0) * w;
+}
+function fbm3(x, y, z, o = 5) { let s = 0, a = .5, f = 1, n = 0; for (let i = 0; i < o; i++) { s += a * vnoise3(x * f, y * f, z * f); n += a; a *= .5; f *= 2.03; } return s / n; }
+function pnoise(x, y, P, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y), u = sm(x - xi), v = sm(y - yi), m = i => ((i % P) + P) % P;
+  const c = (a, b) => hash3(m(xi + a), m(yi + b), seed);
+  const a0 = c(0, 0) + (c(1, 0) - c(0, 0)) * u, a1 = c(0, 1) + (c(1, 1) - c(0, 1)) * u; return a0 + (a1 - a0) * v;
+}
+function pfbm(u, v, base, oct, seed) { let s = 0, a = .5, n = 0, f = base; for (let i = 0; i < oct; i++) { s += a * pnoise(u * f, v * f, f, seed + i); n += a; a *= .5; f *= 2; } return s / n; }
+const canvas2 = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+
+function makeRegolith(S, seed) {
+  const H = new Float32Array(S * S), r = rng(seed), craters = [];
+  for (let i = 0; i < 26; i++) craters.push([r(), r(), .015 + r() * r() * .11]);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S, v = y / S;
+    let h = pfbm(u, v, 5, 5, seed * 10) * .9 + pnoise(u * 64, v * 64, 64, seed + 99) * .12;
+    for (const [cx, cy, cr] of craters) {
+      let dx = Math.abs(u - cx); dx = Math.min(dx, 1 - dx); let dy = Math.abs(v - cy); dy = Math.min(dy, 1 - dy);
+      const d = Math.hypot(dx, dy) / cr;
+      if (d < 1.7) { if (d < 1) h -= (1 - d * d) * .32; h += Math.exp(-(((d - 1) / .2) ** 2)) * .16; }
+    }
+    H[y * S + x] = h;
+  }
+  const col = canvas2(S, S), nor = canvas2(S, S), cc = col.getContext('2d'), nc = nor.getContext('2d');
+  const ci = cc.createImageData(S, S), ni = nc.createImageData(S, S);
+  const at = (x, y) => H[((y + S) % S) * S + ((x + S) % S)];
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = (y * S + x) * 4, h = H[y * S + x];
+    const L = Math.max(0, Math.min(1, .6 + (h - .5) * .5 + (pnoise(x / S * 128, y / S * 128, 128, seed + 7) - .5) * .06));
+    ci.data[i] = L * 255; ci.data[i + 1] = L * 250; ci.data[i + 2] = L * 241; ci.data[i + 3] = 255;
+    let nx = -(at(x + 1, y) - at(x - 1, y)) * 7, ny = (at(x, y + 1) - at(x, y - 1)) * 7, nz = 1; const l = Math.hypot(nx, ny, nz);
+    ni.data[i] = (nx / l * .5 + .5) * 255; ni.data[i + 1] = (ny / l * .5 + .5) * 255; ni.data[i + 2] = (nz / l * .5 + .5) * 255; ni.data[i + 3] = 255;
+  }
+  cc.putImageData(ci, 0, 0); nc.putImageData(ni, 0, 0);
+  return { col, nor };
+}
+function makeEarth() {
+  const W = 512, H = 256, c = canvas2(W, H), cl = canvas2(W, H), x = c.getContext('2d'), y = cl.getContext('2d');
+  const a = x.createImageData(W, H), b = y.createImageData(W, H);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const lon = i / W * Math.PI * 2, lat = (j / H - .5) * Math.PI;
+    const px = Math.cos(lat) * Math.cos(lon), py = Math.sin(lat), pz = Math.cos(lat) * Math.sin(lon);
+    const n = fbm3(px * 1.7 + 5, py * 1.7, pz * 1.7, 5), k = (j * W + i) * 4;
+    const land = sm(Math.max(0, Math.min(1, (n - .5) / .04)));
+    const ice = sm(Math.max(0, Math.min(1, (Math.abs(py) - .82) / .08)));
+    const dry = fbm3(px * 3, py * 3 + 9, pz * 3, 3);
+    const deep = [14, 52, 128], shallow = [36, 108, 196], green = [52, 120, 62], sand = [176, 150, 102];
+    const o = deep.map((v, q) => v + (shallow[q] - v) * sm(Math.max(0, Math.min(1, (n - .38) / .12))));
+    const l = green.map((v, q) => v + (sand[q] - v) * sm(Math.max(0, Math.min(1, (dry - .45) / .2))));
+    for (let q = 0; q < 3; q++) a.data[k + q] = (o[q] + (l[q] - o[q]) * land) * (1 - ice) + 240 * ice;
+    a.data[k + 3] = 255;
+    const cn = fbm3(px * 3.2 + 20, py * 6.5, pz * 3.2, 5);
+    b.data[k] = b.data[k + 1] = b.data[k + 2] = 255; b.data[k + 3] = 255 * sm(Math.max(0, Math.min(1, (cn - .48) / .2)));
+  }
+  x.putImageData(a, 0, 0); y.putImageData(b, 0, 0);
+  return { c, cl };
+}
+function stripeTex() {
+  const S = 256, c = canvas2(S, S), g = c.getContext('2d');
+  g.fillStyle = '#2a2f38'; g.fillRect(0, 0, S, S);
+  g.save(); g.beginPath(); g.rect(0, 0, S, S); g.rect(30, 30, S - 60, S - 60); g.clip('evenodd');
+  g.translate(S / 2, S / 2); g.rotate(Math.PI / 4);
+  for (let i = -S; i < S; i += 36) { g.fillStyle = '#f3b62c'; g.fillRect(i, -S, 18, S * 2); }
+  g.restore();
+  const gr = g.createLinearGradient(0, 0, S, S); gr.addColorStop(0, '#3a414c'); gr.addColorStop(1, '#22262e');
+  g.fillStyle = gr; g.fillRect(34, 34, S - 68, S - 68);
+  g.strokeStyle = 'rgba(255,255,255,.06)'; g.lineWidth = 2;
+  for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(34 + i * (S - 68) / 4, 34); g.lineTo(34 + i * (S - 68) / 4, S - 34); g.stroke(); }
+  return c;
+}
+function padTex() {
+  const S = 512, c = canvas2(S, S), g = c.getContext('2d'), m = S / 2;
+  g.fillStyle = '#2b3039'; g.fillRect(0, 0, S, S);
+  g.save(); g.beginPath(); g.arc(m, m, S * .47, 0, 7); g.arc(m, m, S * .4, 0, 7, true); g.clip();
+  g.translate(m, m); for (let a = 0; a < 48; a++) { g.rotate(Math.PI * 2 / 48); g.fillStyle = a % 2 ? '#f3b62c' : '#16191f'; g.beginPath(); g.moveTo(0, 0); g.lineTo(S, -20); g.lineTo(S, 20); g.fill(); }
+  g.restore();
+  g.strokeStyle = 'rgba(98,227,255,.55)'; g.lineWidth = 4; g.beginPath(); g.arc(m, m, S * .3, 0, 7); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.1)'; g.lineWidth = 2; for (let r2 = .12; r2 < .3; r2 += .06) { g.beginPath(); g.arc(m, m, S * r2, 0, 7); g.stroke(); }
+  return c;
+}
+function solarTex() {
+  const c = canvas2(256, 160), g = c.getContext('2d');
+  g.fillStyle = '#0c1d4a'; g.fillRect(0, 0, 256, 160);
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 5; j++) { const gr = g.createLinearGradient(i * 32, j * 32, i * 32 + 32, j * 32 + 32); gr.addColorStop(0, '#1b3f8f'); gr.addColorStop(1, '#0e2563'); g.fillStyle = gr; g.fillRect(i * 32 + 2, j * 32 + 2, 28, 28); }
+  return c;
+}
+function softDot() {
+  const c = canvas2(64, 64), g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.35, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return c;
+}
+
+/* ---------------- renderer & scene ---------------- */
+const stageEl = document.getElementById('stage');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+} catch (e) {
+  document.getElementById('loadMsg').textContent = t('noWebgl');
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;
+stageEl.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const FOG = new THREE.Color(0x0a1022);
+scene.fog = new THREE.FogExp2(FOG, 0.011);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 1200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.enablePan = false; controls.minPolarAngle = .35; controls.maxPolarAngle = 1.38; controls.rotateSpeed = .6;
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), .75, .55, .82);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function resizeRenderer() {
+  const w = stageEl.clientWidth || 1, h = stageEl.clientHeight || 1;
+  renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h;
+  if (screen === 'menu') {
+    const land = w >= h, phoneLand = land && h <= 560;
+    camera.setViewOffset(w, h, phoneLand ? -w * .2 : land && w >= 900 ? -Math.min(240, w * .17) : 0, land ? 0 : h * .24, w, h);
+  } else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+}
+function resize() {
+  resizeRenderer();
+  if (screen === 'game' && !cinematic && controls.enabled && level) frameBoard(false);
+}
+new ResizeObserver(resize).observe(stageEl);
+
+// Lights
+const sun = new THREE.DirectionalLight(0xfff1e0, 3.1);
+sun.position.set(9, 15, 7); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 60 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02; sun.shadow.radius = 4;
+scene.add(sun, sun.target);
+scene.add(new THREE.HemisphereLight(0x8fb2ff, 0x1a1c24, .55));
+const earthLight = new THREE.DirectionalLight(0x6aa8ff, .45); earthLight.position.set(-10, 6, -12); scene.add(earthLight);
+
+/* ---------------- materials ---------------- */
+let T = {}, MAT = {}, AM = {};
+const glowMat = (hex, i = 2.4) => new THREE.MeshStandardMaterial({ color: 0x000000, emissive: hex, emissiveIntensity: i, roughness: .4 });
+function buildMaterials() {
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  const reg = makeRegolith(512, 3);
+  const tex = (c, srgb, rep = 1) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); t.anisotropy = aniso; return t; };
+  T.reg = tex(reg.col, true); T.regN = tex(reg.nor, false);
+  T.regBig = tex(reg.col, true, 34); T.regBigN = tex(reg.nor, false, 34);
+  T.stripe = tex(stripeTex(), true); T.pad = tex(padTex(), true); T.solar = tex(solarTex(), true); T.dot = tex(softDot(), true);
+  const e = makeEarth(); T.earth = tex(e.c, true); T.cloud = tex(e.cl, true);
+  const regMat = (c, rough = .95) => new THREE.MeshStandardMaterial({ color: c, map: T.reg, normalMap: T.regN, normalScale: new THREE.Vector2(.9, .9), roughness: rough, metalness: 0, envMapIntensity: .35 });
+  MAT.tile = [regMat(0xf2efe8), regMat(0xe4e1da), regMat(0xd8d6d0)];
+  MAT.crater = regMat(0x8a8884); MAT.crater.side = THREE.DoubleSide;
+  MAT.rad = regMat(0x6d6a78);
+  MAT.terrain = new THREE.MeshStandardMaterial({ color: 0xb9b6ae, map: T.regBig, normalMap: T.regBigN, normalScale: new THREE.Vector2(1.2, 1.2), roughness: 1, envMapIntensity: .25 });
+  MAT.rock = new THREE.MeshStandardMaterial({ color: 0x8d8a85, map: T.reg, normalMap: T.regN, roughness: .92, envMapIntensity: .3 });
+  MAT.metal = new THREE.MeshStandardMaterial({ color: 0xc9ced6, metalness: .9, roughness: .28 });
+  MAT.dark = new THREE.MeshStandardMaterial({ color: 0x2a2f38, metalness: .75, roughness: .38 });
+  MAT.stripe = new THREE.MeshStandardMaterial({ map: T.stripe, metalness: .5, roughness: .45 });
+  MAT.pad = new THREE.MeshStandardMaterial({ map: T.pad, metalness: .55, roughness: .45 });
+  MAT.white = new THREE.MeshPhysicalMaterial({ color: 0xf3f5f9, roughness: .3, metalness: .05, clearcoat: 1, clearcoatRoughness: .18 });
+  MAT.red = new THREE.MeshPhysicalMaterial({ color: 0xe0452a, roughness: .32, metalness: .1, clearcoat: 1, clearcoatRoughness: .2 });
+  MAT.window = new THREE.MeshPhysicalMaterial({ color: 0x0a1424, metalness: 1, roughness: .05, iridescence: .7, iridescenceIOR: 1.5, envMapIntensity: 2 });
+  MAT.solar = new THREE.MeshPhysicalMaterial({ map: T.solar, metalness: .6, roughness: .22, clearcoat: 1 });
+  MAT.gold = new THREE.MeshStandardMaterial({ color: 0xffc35a, metalness: 1, roughness: .3 });
+  MAT.pcb = new THREE.MeshStandardMaterial({ color: 0x0f5a2c, roughness: .5, metalness: .2 });
+  MAT.cyan = glowMat(0x62e3ff); MAT.green = glowMat(0x3dff8a, 2.2); MAT.orange = glowMat(0xff7a1f, 2); MAT.purple = glowMat(0xb05cff, 2.6); MAT.amberGlow = glowMat(0xff9a2e, 1.4);
+  MAT.glass = new THREE.MeshPhysicalMaterial({ color: 0xcfe6ff, transparent: true, opacity: .32, roughness: .05, depthWrite: false });
+  MAT.foam = new THREE.MeshStandardMaterial({ color: 0xd9782f, roughness: .85 });
+  AM.armor = new THREE.MeshPhysicalMaterial({ color: 0xf2f4f8, roughness: .28, metalness: .1, clearcoat: 1, clearcoatRoughness: .2 });
+  AM.under = new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: .7, metalness: .1 });
+  AM.carbon = new THREE.MeshStandardMaterial({ color: 0x2d323b, roughness: .35, metalness: .7 });
+  AM.visor = new THREE.MeshPhysicalMaterial({ color: 0x0b1220, metalness: 1, roughness: .06, iridescence: .8, iridescenceIOR: 1.6, envMapIntensity: 2.2, clearcoat: 1 });
+  AM.glow = MAT.cyan;
+}
+
+const HOLO_VS = `#include <common>
+#include <clipping_planes_pars_vertex>
+varying vec3 vN; varying vec3 vV; varying float vY;
+void main(){
+#include <begin_vertex>
+#include <project_vertex>
+#include <clipping_planes_vertex>
+vN=normalize(normalMatrix*normal); vV=normalize(-mvPosition.xyz); vY=(modelMatrix*vec4(position,1.0)).y;
+}`;
+const HOLO_FS = `#include <clipping_planes_pars_fragment>
+uniform float uTime; uniform vec3 uColor; uniform float uOpacity;
+varying vec3 vN; varying vec3 vV; varying float vY;
+void main(){
+#include <clipping_planes_fragment>
+float f=pow(1.0-abs(dot(normalize(vN),normalize(vV))),2.0);
+float scan=.6+.4*sin(vY*28.0-uTime*4.0);
+gl_FragColor=vec4(uColor*(.5+f),(.05+f*.75)*scan*uOpacity);
+}`;
+const holoMats = [];
+function holoMat(op) {
+  const m = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0x62e3ff) }, uOpacity: { value: op } }, vertexShader: HOLO_VS, fragmentShader: HOLO_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, clipping: true });
+  holoMats.push(m); return m;
+}
+const FADE_VS = `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
+const beamMat = () => new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xc070ff) }, uOpacity: { value: .05 } }, vertexShader: FADE_VS,
+  fragmentShader: `uniform float uTime; uniform vec3 uColor; uniform float uOpacity; varying vec2 vUv;
+  void main(){ float a=pow(1.0-vUv.y,1.6)*(.6+.4*sin(vUv.y*22.0-uTime*7.0))*uOpacity; gl_FragColor=vec4(uColor*1.6,a); }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+const flameMat = () => new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uOpacity: { value: 1 } }, vertexShader: FADE_VS,
+  fragmentShader: `uniform float uTime; uniform float uOpacity; varying vec2 vUv;
+  void main(){ float y=vUv.y; vec3 c=mix(vec3(1.0,.95,.8),vec3(1.0,.45,.08),smoothstep(.0,.55,y)); c=mix(c,vec3(.5,.2,1.0),smoothstep(.7,1.0,y)*.4);
+  float a=pow(1.0-y,1.1)*(.8+.2*sin(y*40.0-uTime*30.0))*uOpacity; gl_FragColor=vec4(c*2.2,a); }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+
+/* ---------------- helpers ---------------- */
+function mk(geo, mat, x = 0, y = 0, z = 0, parent, shadow = true) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
+  m.castShadow = shadow; m.receiveShadow = true; if (parent) parent.add(m); return m;
+}
+const RB = (w, h, d, r, s = 2) => new RoundedBoxGeometry(w, h, d, s, r);
+function lumpyRock(seed) {
+  const g = new THREE.IcosahedronGeometry(1, 2), p = g.attributes.position, r = rng(seed);
+  const o = [r() * 10, r() * 10];
+  for (let i = 0; i < p.count; i++) {
+    const v = new THREE.Vector3().fromBufferAttribute(p, i), n = fbm3(v.x * 1.4 + o[0], v.y * 1.4, v.z * 1.4 + o[1], 3);
+    v.multiplyScalar(.75 + n * .55); v.y *= .72; p.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals(); return g;
+}
+
+/* ---------------- sky, Earth, terrain ---------------- */
+function buildSky() {
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 32, 16), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    vertexShader: `varying vec3 vD; void main(){ vD=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `varying vec3 vD; void main(){ vec3 n=normalize(vec3(.35,.6,-.72)); float band=exp(-pow(dot(vD,n)/.2,2.0));
+      vec3 c=mix(vec3(.039,.063,.133),vec3(.012,.016,.035),smoothstep(-.05,.5,vD.y)); c+=vec3(.09,.07,.16)*band*smoothstep(-.1,.3,vD.y); gl_FragColor=vec4(c,1.0); }`
+  }));
+  scene.add(sky);
+  const N = 3200, pos = new Float32Array(N * 3), col = new Float32Array(N * 3), r = rng(42);
+  for (let i = 0; i < N; i++) {
+    let v; do { v = new THREE.Vector3(r() * 2 - 1, r() * 2 - 1, r() * 2 - 1); } while (v.lengthSq() > 1 || v.lengthSq() < .01);
+    v.normalize(); if (v.y < -.05) v.y = -v.y; v.multiplyScalar(560); pos.set([v.x, v.y, v.z], i * 3);
+    const b = .45 + r() * .55, t = r(); col.set(t < .15 ? [b * .8, b * .9, b] : t > .92 ? [b, b * .85, b * .7] : [b, b, b], i * 3);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 2.2, sizeAttenuation: false, map: T.dot, vertexColors: true, transparent: true, depthWrite: false, fog: false })));
+  const earth = new THREE.Group(); earth.position.set(-190, 40, -260); scene.add(earth);
+  const em = new THREE.MeshStandardMaterial({ map: T.earth, roughness: .7, emissive: 0xffffff, emissiveMap: T.earth, emissiveIntensity: .12, fog: false });
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(30, 64, 48), em); earth.add(ball);
+  const clouds = new THREE.Mesh(new THREE.SphereGeometry(30.5, 64, 48), new THREE.MeshStandardMaterial({ map: T.cloud, transparent: true, depthWrite: false, roughness: 1, emissive: 0xffffff, emissiveMap: T.cloud, emissiveIntensity: .12, fog: false }));
+  earth.add(clouds);
+  earth.add(new THREE.Mesh(new THREE.SphereGeometry(33, 48, 32), new THREE.ShaderMaterial({
+    side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    vertexShader: `varying vec3 vN; void main(){ vN=normalize(normalMatrix*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `varying vec3 vN; void main(){ float i=pow(.72-dot(vN,vec3(0,0,1.0)),3.0); gl_FragColor=vec4(.35,.65,1.0,1.0)*i*1.6; }`
+  })));
+  ball.rotation.z = .35; clouds.rotation.z = .35;
+  return { earth, ball, clouds };
+}
+const ROCKET_POS = new THREE.Vector3(-8.2, 0, -4.6);
+function terrainHeight(x, z) {
+  const fx = Math.max(Math.abs(x) - 5.2, 0), fz = Math.max(Math.abs(z) - 5.2, 0);
+  const dRect = Math.hypot(fx, fz), dPad = Math.max(0, Math.hypot(x - ROCKET_POS.x, z - ROCKET_POS.z) - 2.6);
+  const d = Math.min(dRect, dPad), f = sm(Math.min(1, d / 9));
+  let h = -0.55 + (fbm3(x * .045, 0, z * .045, 4) - .45) * 9 * f + (fbm3(x * .25, 3, z * .25, 3) - .5) * .5 * f + (fbm3(x * .9, 7, z * .9, 2) - .5) * .06;
+  for (const [cx, cz, R] of CRATERS) { const u = Math.hypot(x - cx, z - cz) / R; if (u < 1.8) { h += ((u < 1 ? -(1 - u * u) * .9 : 0) + Math.exp(-(((u - 1) / .28) ** 2)) * .35) * R * .32 * f; } }
+  return h;
+}
+const CRATERS = [[16, -12, 6], [-20, 10, 8], [24, 14, 5], [-6, 22, 4.5], [5, -26, 7], [-30, -18, 9], [34, -2, 6], [-14, -30, 5], [14, 30, 7], [-38, 6, 5]];
+function buildTerrain() {
+  const g = new THREE.PlaneGeometry(420, 420, 240, 240); g.rotateX(-Math.PI / 2);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setY(i, terrainHeight(p.getX(i), p.getZ(i)));
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, MAT.terrain); m.receiveShadow = true; scene.add(m);
+  const r = rng(9), geos = [lumpyRock(1), lumpyRock(2), lumpyRock(3)];
+  for (const geo of geos) {
+    const inst = new THREE.InstancedMesh(geo, MAT.rock, 40); inst.castShadow = inst.receiveShadow = true;
+    const o = new THREE.Object3D(); let c = 0;
+    while (c < 40) {
+      const x = (r() - .5) * 90, z = (r() - .5) * 90;
+      if (Math.abs(x) < 6.5 && Math.abs(z) < 6.5) continue;
+      if (Math.hypot(x - ROCKET_POS.x, z - ROCKET_POS.z) < 3.4) continue;
+      const s = .15 + r() ** 2.5 * 1.4;
+      o.position.set(x, terrainHeight(x, z) + s * .2, z); o.rotation.set(r() * .4, r() * 6.28, r() * .4); o.scale.setScalar(s); o.updateMatrix(); inst.setMatrixAt(c++, o.matrix);
+    }
+    scene.add(inst);
+  }
+}
+
+/* ---------------- astronaut ---------------- */
+function buildAstronaut() {
+  const M = AM, root = new THREE.Group(), body = new THREE.Group(); body.scale.setScalar(.5); root.add(body);
+  const hips = new THREE.Group(); hips.position.set(0, .95, 0); body.add(hips);
+  mk(RB(.34, .18, .22, .06, 3), M.under, 0, -.02, 0, hips);
+  mk(RB(.36, .06, .24, .025), M.carbon, 0, .06, 0, hips);
+  mk(RB(.08, .016, .01, .004, 1), M.glow, 0, .06, .122, hips, false);
+  mk(RB(.18, .12, .04, .018), M.armor, 0, -.03, .1, hips);
+  const torso = new THREE.Group(); torso.position.set(0, .06, 0); hips.add(torso);
+  mk(RB(.36, .44, .23, .08, 3), M.under, 0, .23, 0, torso);
+  mk(RB(.41, .24, .27, .06, 3), M.armor, 0, .33, .005, torso);
+  mk(RB(.3, .05, .24, .02), M.carbon, 0, .15, 0, torso);
+  mk(RB(.28, .05, .23, .02), M.carbon, 0, .09, 0, torso);
+  mk(new THREE.CylinderGeometry(.036, .036, .03, 24), M.glow, 0, .3, .142, torso, false).rotation.x = Math.PI / 2;
+  mk(new THREE.TorusGeometry(.048, .012, 10, 28), M.carbon, 0, .3, .14, torso);
+  for (const s of [-1, 1]) mk(RB(.12, .012, .012, .005, 1), M.glow, s * .12, .26, .139, torso, false);
+  mk(new THREE.TorusGeometry(.115, .03, 12, 32), M.carbon, 0, .46, 0, torso).rotation.x = Math.PI / 2;
+  mk(new THREE.TorusGeometry(.118, .007, 8, 32), M.glow, 0, .44, 0, torso, false).rotation.x = Math.PI / 2;
+  const pack = new THREE.Group(); pack.position.set(0, .25, -.18); torso.add(pack);
+  mk(RB(.3, .4, .14, .04, 3), M.carbon, 0, 0, 0, pack);
+  mk(RB(.26, .3, .06, .025), M.armor, 0, .03, -.06, pack);
+  mk(RB(.016, .22, .01, .004, 1), M.glow, 0, .03, -.092, pack, false);
+  for (const s of [-1, 1]) { mk(new THREE.CylinderGeometry(.05, .05, .09, 20), M.carbon, s * .08, -.22, -.02, pack); mk(new THREE.CylinderGeometry(.036, .036, .012, 20), M.glow, s * .08, -.27, -.02, pack, false); }
+  const head = new THREE.Group(); head.position.set(0, .48, 0); torso.add(head);
+  mk(new THREE.SphereGeometry(1, 40, 28), M.armor, 0, .17, 0, head).scale.set(.17, .19, .19);
+  mk(new THREE.SphereGeometry(1, 40, 28), M.visor, 0, .185, .05, head).scale.set(.162, .14, .16);
+  const vg = mk(new THREE.TorusGeometry(1, .035, 8, 48), M.glow, 0, .112, .02, head, false); vg.rotation.x = Math.PI / 2; vg.scale.setScalar(.168);
+  mk(RB(.05, .06, .3, .02), M.carbon, 0, .345, -.02, head);
+  mk(RB(.014, .012, .24, .005, 1), M.glow, 0, .377, -.02, head, false);
+  for (const s of [-1, 1]) { mk(new THREE.CylinderGeometry(.05, .05, .05, 24), M.carbon, s * .165, .17, -.02, head).rotation.z = Math.PI / 2; mk(new THREE.CylinderGeometry(.028, .028, .056, 20), M.glow, s * .165, .17, -.02, head, false).rotation.z = Math.PI / 2; }
+  const arm = s => {
+    const up = new THREE.Group(); up.position.set(s * .27, .39, 0); torso.add(up);
+    mk(new THREE.SphereGeometry(1, 28, 18), M.armor, 0, .03, 0, up).scale.set(.105, .075, .105);
+    mk(new THREE.TorusGeometry(.105, .006, 8, 32), M.glow, 0, 0, 0, up, false).rotation.x = Math.PI / 2;
+    mk(new THREE.CapsuleGeometry(.058, .18, 6, 16), M.under, 0, -.13, 0, up);
+    mk(new THREE.CapsuleGeometry(.066, .07, 6, 16), M.armor, 0, -.15, 0, up);
+    const lo = new THREE.Group(); lo.position.set(0, -.26, 0); up.add(lo);
+    mk(new THREE.SphereGeometry(.06, 20, 14), M.carbon, 0, 0, 0, lo);
+    mk(new THREE.CapsuleGeometry(.055, .15, 6, 16), M.under, 0, -.12, 0, lo);
+    mk(new THREE.CapsuleGeometry(.068, .09, 6, 16), M.armor, 0, -.14, 0, lo);
+    mk(RB(.05, .07, .012, .005, 1), M.glow, 0, -.13, .07, lo, false);
+    mk(new THREE.TorusGeometry(.06, .008, 8, 28), M.glow, 0, -.215, 0, lo, false).rotation.x = Math.PI / 2;
+    mk(RB(.084, .136, .112, .03, 3), M.carbon, 0, -.3, .005, lo);
+    return { up, lo };
+  };
+  const leg = s => {
+    const up = new THREE.Group(); up.position.set(s * .11, -.06, 0); hips.add(up);
+    mk(new THREE.CapsuleGeometry(.08, .27, 6, 16), M.under, 0, -.19, 0, up);
+    mk(new THREE.CapsuleGeometry(.088, .13, 6, 16), M.armor, 0, -.16, .004, up);
+    mk(RB(.016, .16, .01, .004, 1), M.glow, 0, -.16, .091, up, false);
+    const lo = new THREE.Group(); lo.position.set(0, -.39, 0); up.add(lo);
+    mk(new THREE.SphereGeometry(1, 20, 14), M.armor, 0, 0, .015, lo).scale.set(.08, .07, .08);
+    mk(new THREE.SphereGeometry(.025, 12, 8), M.glow, 0, 0, .094, lo, false);
+    mk(new THREE.CapsuleGeometry(.068, .25, 6, 16), M.under, 0, -.19, 0, lo);
+    mk(RB(.12, .24, .1, .04), M.armor, 0, -.19, .035, lo);
+    mk(RB(.012, .16, .01, .004, 1), M.glow, 0, -.19, .087, lo, false);
+    mk(RB(.16, .13, .28, .05, 3), M.armor, 0, -.42, .035, lo);
+    mk(RB(.17, .04, .29, .015), M.carbon, 0, -.48, .035, lo);
+    mk(RB(.166, .012, .286, .005, 1), M.glow, 0, -.46, .035, lo, false);
+    return { up, lo };
+  };
+  const A = { root, body, hips, torso, head, armL: arm(1), armR: arm(-1), legL: leg(1), legR: leg(-1), walk: 0, moving: 0, cheer: 0 };
+  return A;
+}
+function animateAstronaut(A, dt, time) {
+  const w = A.walk, m = A.moving, idle = 1 - m;
+  const sw = Math.sin(w) * .55 * m;
+  A.legL.up.rotation.x = sw; A.legR.up.rotation.x = -sw;
+  A.legL.lo.rotation.x = Math.max(0, -Math.sin(w)) * .7 * m; A.legR.lo.rotation.x = Math.max(0, Math.sin(w)) * .7 * m;
+  const cheer = A.cheer;
+  A.armL.up.rotation.x = -sw * .8 - cheer * 2.6; A.armR.up.rotation.x = sw * .8 - cheer * 2.6;
+  A.armL.up.rotation.z = .12 + cheer * .3; A.armR.up.rotation.z = -.12 - cheer * .3;
+  A.armL.lo.rotation.x = -.25 - .2 * m; A.armR.lo.rotation.x = -.25 - .2 * m;
+  A.hips.position.y = .95 + Math.abs(Math.sin(w)) * .03 * m + Math.sin(time * 2) * .006 * idle;
+  A.torso.rotation.x = .06 * m + Math.sin(time * 2) * .015 * idle;
+  A.head.rotation.y = Math.sin(time * .7) * .25 * idle;
+}
+
+/* ---------------- rocket ---------------- */
+function lathe(pts, seg = 48) { return new THREE.LatheGeometry(pts.map(p => new THREE.Vector2(p[0], p[1])), seg); }
+function buildRocket() {
+  const root = new THREE.Group(); root.position.copy(ROCKET_POS); scene.add(root);
+  const pad = mk(new THREE.CylinderGeometry(2.2, 2.4, .62, 64), [MAT.dark, MAT.pad, MAT.dark], 0, -.31, 0, root);
+  pad.castShadow = false;
+  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; mk(new THREE.CylinderGeometry(.05, .05, .02, 12), MAT.amberGlow, Math.cos(a) * 1.95, .01, Math.sin(a) * 1.95, root, false); }
+  const S = [];
+  const g1 = new THREE.Group();
+  mk(new THREE.CylinderGeometry(1, 1.05, .14, 48), MAT.dark, 0, .08, 0, g1);
+  for (const y of [.22, 1.38]) mk(new THREE.TorusGeometry(.62, .035, 12, 48), MAT.metal, 0, y, 0, g1).rotation.x = Math.PI / 2;
+  for (let k = 0; k < 4; k++) {
+    const a = Math.PI / 4 + k * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+    mk(RB(.07, 1.2, .07, .02), MAT.metal, ca * .62, .8, sa * .62, g1);
+    const top = new THREE.Vector3(ca * .62, 1.2, sa * .62), foot = new THREE.Vector3(ca * 1.38, .05, sa * 1.38), dir = foot.clone().sub(top), len = dir.length();
+    const strut = mk(new THREE.CylinderGeometry(.04, .05, len, 12), MAT.metal, 0, 0, 0, g1); strut.position.copy(top).addScaledVector(dir, .5);
+    strut.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    mk(new THREE.CylinderGeometry(.2, .24, .07, 24), MAT.dark, foot.x, .04, foot.z, g1);
+    mk(RB(.09, .09, .09, .02), MAT.red, ca * .66, 1.38, sa * .66, g1);
+  }
+  S.push(g1);
+  const g2 = new THREE.Group();
+  mk(new THREE.CylinderGeometry(.55, .55, 1.3, 48), MAT.white, 0, 1.95, 0, g2);
+  for (const y of [1.42, 2.46]) mk(new THREE.CylinderGeometry(.565, .565, .1, 48), MAT.red, 0, y, 0, g2);
+  const flames = [], nozzleGlows = [];
+  for (let k = 0; k < 3; k++) {
+    const a = k * Math.PI * 2 / 3, x = Math.sin(a) * .28, z = Math.cos(a) * .28;
+    const bell = mk(lathe([[.1, 0], [.12, -.08], [.18, -.26], [.27, -.52]], 32), MAT.dark, x, 1.3, z, g2); bell.material = MAT.dark.clone(); bell.material.side = THREE.DoubleSide;
+    const glow = mk(new THREE.CircleGeometry(.25, 24), MAT.orange.clone(), x, .79, z, g2, false); glow.rotation.x = Math.PI / 2; glow.material.side = THREE.DoubleSide; glow.material.emissiveIntensity = .4; nozzleGlows.push(glow);
+    const fl = new THREE.Mesh(new THREE.ConeGeometry(.25, 2.4, 24, 1, true), flameMat()); fl.rotation.x = Math.PI; fl.position.set(x, .78 - 1.2, z); fl.visible = false; root.add(fl); flames.push(fl);
+    const pipe = mk(new THREE.CylinderGeometry(.03, .03, .9, 10), MAT.metal, Math.sin(a + .5) * .5, 1.15, Math.cos(a + .5) * .5, g2);
+  }
+  S.push(g2);
+  const g3 = new THREE.Group();
+  for (let k = 0; k < 4; k++) {
+    const a = k * Math.PI / 2, x = Math.sin(a), z = Math.cos(a);
+    const strip = mk(RB(.04, 1.0, .02, .008, 1), MAT.cyan, x * .556, 1.95, z * .556, g3, false); strip.rotation.y = a;
+    const pod = mk(RB(.14, .1, .08, .03), MAT.dark, x * .58, 2.62, z * .58, g3); pod.rotation.y = a;
+    mk(new THREE.SphereGeometry(.026, 12, 8), MAT.cyan, x * .63, 2.62, z * .63, g3, false);
+  }
+  mk(new THREE.CylinderGeometry(.015, .015, .75, 8), MAT.metal, .3, 3.75, 0, g3);
+  mk(new THREE.SphereGeometry(.045, 12, 8), MAT.cyan, .3, 4.14, 0, g3, false);
+  S.push(g3);
+  const g4 = new THREE.Group();
+  mk(lathe([[.555, 2.6], [.55, 2.8], [.51, 3.1], [.43, 3.42], [.4, 3.5]]), MAT.white, 0, 0, 0, g4);
+  const win = mk(new THREE.SphereGeometry(1, 32, 20), MAT.window, 0, 3.02, .47, g4); win.scale.set(.22, .17, .08); win.rotation.x = -.2;
+  mk(new THREE.TorusGeometry(1, .12, 10, 32), MAT.metal, 0, 3.02, .475, g4).scale.set(.22, .17, .2);
+  for (const s of [-1, 1]) {
+    mk(RB(.5, .04, .04, .015), MAT.metal, s * .75, 2.9, 0, g4);
+    const p = mk(RB(.75, .025, .46, .01, 1), MAT.solar, s * 1.35, 2.9, 0, g4); p.rotation.x = .25;
+    mk(new THREE.CapsuleGeometry(.07, .3, 6, 16), MAT.white, s * .42, 2.0, .42, g4);
+    mk(new THREE.CylinderGeometry(.073, .073, .04, 16), MAT.cyan, s * .42, 2.05, .42, g4, false);
+  }
+  S.push(g4);
+  const g5 = new THREE.Group();
+  mk(lathe([[.4, 3.5], [.39, 3.68], [.32, 3.98], [.19, 4.28], [.06, 4.46], [0, 4.5]]), MAT.red, 0, 0, 0, g5);
+  mk(new THREE.TorusGeometry(.575, .03, 10, 48), MAT.cyan, 0, 2.6, 0, g5, false).rotation.x = Math.PI / 2;
+  for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3 + .5; const c = mk(new THREE.OctahedronGeometry(.08, 0), MAT.cyan, Math.sin(a) * .6, 2.28, Math.cos(a) * .6, g5, false); c.scale.y = 2; }
+  S.push(g5);
+  // Each stage: solid copy (clipped below a plane) + hologram copy (clipped above)
+  const stages = S.map((g, i) => {
+    g.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(g);
+    const pSolid = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0), pHolo = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    g.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.clippingPlanes = [pSolid]; o.material.clipShadows = true; } });
+    const holo = g.clone(true), hm = holoMat(.6);
+    hm.clippingPlanes = [pHolo];
+    holo.traverse(o => { if (o.isMesh) { o.material = hm; o.castShadow = false; } });
+    root.add(g, holo);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1, .015, 8, 64), glowMat(0x62e3ff)); ring.rotation.x = Math.PI / 2; ring.visible = false; root.add(ring);
+    return { solid: g, holo, hm, pSolid, pHolo, minY: box.min.y, maxY: box.max.y, p: -1, ring, rad: Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2 + .1 };
+  });
+  const engineLight = new THREE.PointLight(0xff8a3a, 0, 14, 2); engineLight.position.set(0, .2, 0); root.add(engineLight);
+  return { root, stages, flames, nozzleGlows, engineLight };
+}
+function setStage(st, p, current) {
+  st.p = p;
+  const H = st.minY + (st.maxY - st.minY) * p + ROCKET.root.position.y;
+  st.pSolid.constant = p >= 1 ? 1e4 : p <= 0 ? -1e4 : H;
+  st.pHolo.constant = p >= 1 ? -1e4 : p <= 0 ? 1e4 : -H;
+  st.solid.visible = p > 0; st.holo.visible = p < 1;
+  st.hm.uniforms.uOpacity.value = current ? .85 : .32;
+  st.ring.visible = p > 0 && p < 1; st.ring.position.y = st.minY + (st.maxY - st.minY) * p; st.ring.scale.setScalar(st.rad);
+}
+function refreshRocket() {
+  const cur = Math.min(4, Math.floor(doneCount() / 20));
+  ROCKET.stages.forEach((st, i) => setStage(st, stageProgress(i), i === cur));
+}
+
+/* ---------------- parts ---------------- */
+const PM = {
+  platform: g => { mk(new THREE.CylinderGeometry(.22, .24, .06, 40), MAT.dark, 0, -.05, 0, g); mk(new THREE.TorusGeometry(.2, .02, 8, 40), MAT.red, 0, -.01, 0, g).rotation.x = Math.PI / 2; mk(new THREE.CylinderGeometry(.1, .1, .03, 32), MAT.metal, 0, 0, 0, g); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + .78; mk(new THREE.CylinderGeometry(.04, .05, .07, 16), MAT.metal, Math.cos(a) * .19, -.11, Math.sin(a) * .19, g); } g.rotation.x = .5; },
+  strut: g => { mk(new THREE.CapsuleGeometry(.03, .36, 6, 12), MAT.metal, 0, 0, 0, g).rotation.z = .45; mk(new THREE.CylinderGeometry(.09, .11, .03, 24), MAT.dark, -.09, -.2, 0, g); mk(new THREE.SphereGeometry(.045, 16, 12), MAT.red, .09, .19, 0, g); },
+  shock: g => { for (let i = 0; i < 6; i++) mk(new THREE.TorusGeometry(.07, .014, 8, 24), MAT.metal, 0, -.12 + i * .05, 0, g).rotation.x = Math.PI / 2; mk(new THREE.CylinderGeometry(.025, .025, .38, 12), MAT.dark, 0, 0, 0, g); for (const y of [-.19, .19]) mk(new THREE.CylinderGeometry(.08, .08, .04, 20), MAT.red, 0, y, 0, g); },
+  ring: g => { const r = mk(new THREE.TorusGeometry(.18, .035, 12, 48), MAT.metal, 0, 0, 0, g); r.rotation.x = 1.2; for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; r.add(mk(new THREE.SphereGeometry(.024, 10, 8), MAT.red, Math.cos(a) * .18, Math.sin(a) * .18, .03)); } },
+  beam: g => { for (const z of [-.06, .06]) mk(RB(.14, .44, .02, .008, 1), MAT.metal, 0, 0, z, g); mk(RB(.02, .44, .12, .008, 1), MAT.metal, 0, 0, 0, g); for (const y of [-.23, .23]) mk(RB(.16, .03, .16, .01), MAT.red, 0, y, 0, g); g.rotation.z = .3; },
+  brace: g => { for (const x of [-.15, .15]) mk(RB(.04, .44, .04, .012), MAT.metal, x, 0, 0, g); mk(new THREE.CylinderGeometry(.018, .018, .5, 10), MAT.red, 0, 0, 0, g).rotation.z = -Math.atan2(.3, .42); },
+  mount: g => { mk(new THREE.CylinderGeometry(.22, .22, .04, 6), MAT.dark, 0, 0, 0, g); for (let k = 0; k < 3; k++) { const a = k * 2.094, x = Math.sin(a) * .11, z = Math.cos(a) * .11; mk(new THREE.CylinderGeometry(.06, .06, .1, 24), MAT.metal, x, .05, z, g); mk(new THREE.TorusGeometry(.06, .012, 8, 24), MAT.red, x, .1, z, g).rotation.x = Math.PI / 2; } g.rotation.x = .5; },
+  lock: g => { mk(new THREE.CylinderGeometry(.11, .11, .16, 32), MAT.metal, 0, 0, 0, g); mk(RB(.08, .1, .08, .02), MAT.red, .12, 0, 0, g); mk(new THREE.TorusGeometry(.05, .015, 8, 20), MAT.dark, 0, .13, 0, g); mk(new THREE.SphereGeometry(.02, 10, 8), MAT.cyan, .165, 0, 0, g, false); },
+  nozzle: g => { const b = mk(lathe([[.08, .16], [.1, .06], [.15, -.06], [.22, -.2]], 32), MAT.dark.clone(), 0, 0, 0, g); b.material.side = THREE.DoubleSide; mk(new THREE.CylinderGeometry(.09, .09, .1, 24), MAT.metal, 0, .2, 0, g); mk(new THREE.CircleGeometry(.2, 24), MAT.orange, 0, -.19, 0, g, false).rotation.x = Math.PI / 2; },
+  chamber: g => { mk(new THREE.SphereGeometry(.13, 28, 20), MAT.metal, 0, .07, 0, g).scale.y = 1.2; const b = mk(lathe([[.06, 0], [.08, -.06], [.13, -.2]], 28), MAT.dark.clone(), 0, -.06, 0, g); b.material.side = THREE.DoubleSide; mk(new THREE.CylinderGeometry(.02, .02, .22, 8), MAT.gold, .12, .14, 0, g).rotation.z = .6; },
+  turbopump: g => { mk(new THREE.CylinderGeometry(.12, .12, .16, 32), MAT.metal, 0, 0, 0, g).rotation.z = Math.PI / 2; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, b = mk(RB(.01, .09, .03, .004, 1), MAT.dark, .09, Math.cos(a) * .05, Math.sin(a) * .05, g); b.rotation.x = a; } mk(new THREE.TorusGeometry(.12, .015, 8, 32), MAT.red, .085, 0, 0, g).rotation.y = Math.PI / 2; mk(new THREE.CylinderGeometry(.035, .035, .18, 12), MAT.gold, -.05, .13, 0, g); },
+  tank: g => { mk(new THREE.CapsuleGeometry(.12, .18, 8, 24), MAT.white, 0, 0, 0, g); mk(new THREE.CylinderGeometry(.125, .125, .04, 24), MAT.red, 0, .04, 0, g); mk(new THREE.CylinderGeometry(.03, .03, .06, 12), MAT.metal, 0, .24, 0, g); },
+  oxTank: g => { mk(new THREE.CapsuleGeometry(.12, .18, 8, 24), MAT.white, 0, 0, 0, g); for (const y of [-.05, .05]) mk(new THREE.CylinderGeometry(.124, .124, .02, 24), MAT.cyan, 0, y, 0, g, false); mk(new THREE.CylinderGeometry(.03, .03, .06, 12), MAT.metal, 0, .24, 0, g); },
+  pipe: g => { mk(new THREE.TorusGeometry(.14, .03, 12, 32, Math.PI), MAT.metal, 0, -.05, 0, g); for (const x of [-.14, .14]) mk(new THREE.CylinderGeometry(.05, .05, .03, 16), MAT.red, x, -.05, 0, g); },
+  valve: g => { mk(new THREE.CylinderGeometry(.04, .04, .36, 16), MAT.metal, 0, -.05, 0, g).rotation.z = Math.PI / 2; mk(RB(.12, .12, .12, .03), MAT.dark, 0, -.05, 0, g); mk(new THREE.CylinderGeometry(.015, .015, .12, 8), MAT.metal, 0, .06, 0, g); mk(new THREE.TorusGeometry(.08, .015, 8, 32), MAT.red, 0, .12, 0, g).rotation.x = Math.PI / 2; for (let k = 0; k < 2; k++) mk(RB(.16, .012, .012, .004, 1), MAT.red, 0, .12, 0, g).rotation.y = k * Math.PI / 2; },
+  regulator: g => { mk(new THREE.CylinderGeometry(.12, .12, .06, 32), MAT.metal, 0, 0, 0, g).rotation.x = Math.PI / 2; mk(new THREE.CircleGeometry(.1, 32), MAT.cyan, 0, 0, .032, g, false); mk(RB(.012, .08, .006, .003, 1), MAT.red, .02, .02, .038, g).rotation.z = -.6; mk(new THREE.CylinderGeometry(.03, .03, .18, 12), MAT.metal, 0, -.18, 0, g); },
+  insulation: g => { mk(new THREE.CylinderGeometry(.13, .13, .34, 32), MAT.foam, 0, 0, 0, g); for (const y of [-.1, 0, .1]) mk(new THREE.TorusGeometry(.132, .008, 6, 32), MAT.dark, 0, y, 0, g).rotation.x = Math.PI / 2; },
+  gimbal: g => { mk(new THREE.TorusGeometry(.18, .02, 10, 40), MAT.metal, 0, 0, 0, g); mk(new THREE.TorusGeometry(.13, .02, 10, 40), MAT.red, 0, 0, 0, g).rotation.y = Math.PI / 2; mk(new THREE.SphereGeometry(.06, 20, 14), MAT.dark, 0, 0, 0, g); },
+  actuator: g => { const p = new THREE.Group(); p.rotation.z = .5; g.add(p); mk(new THREE.CylinderGeometry(.05, .05, .24, 20), MAT.dark, 0, -.06, 0, p); mk(new THREE.CylinderGeometry(.022, .022, .2, 12), MAT.metal, 0, .14, 0, p); for (const y of [-.2, .25]) mk(new THREE.TorusGeometry(.03, .012, 8, 16), MAT.red, 0, y, 0, p); },
+  igniter: g => { mk(new THREE.CylinderGeometry(.05, .05, .2, 6), MAT.metal, 0, .05, 0, g); mk(new THREE.CylinderGeometry(.03, .03, .1, 16), MAT.white, 0, -.1, 0, g); mk(new THREE.SphereGeometry(.03, 12, 8), MAT.orange, 0, -.17, 0, g, false); },
+  powerUnit: g => { mk(RB(.3, .2, .2, .03), MAT.dark, 0, 0, 0, g); for (const y of [-.04, .04]) mk(RB(.22, .012, .01, .004, 1), MAT.cyan, 0, y, .101, g, false); for (const x of [-.08, .08]) mk(new THREE.CylinderGeometry(.025, .025, .06, 12), MAT.gold, x, .12, 0, g); },
+  computer: g => { mk(RB(.3, .22, .18, .03), MAT.dark, 0, 0, 0, g); mk(RB(.2, .1, .01, .004, 1), MAT.cyan, 0, .03, .091, g, false); for (let i = 0; i < 4; i++) mk(RB(.04, .01, .01, .003, 1), MAT.metal, -.09 + i * .06, -.07, .091, g); },
+  chip: g => { mk(RB(.36, .05, .36, .015), MAT.pcb, 0, 0, 0, g); mk(RB(.16, .07, .16, .02), MAT.dark, 0, .02, 0, g); mk(RB(.07, .08, .07, .02), MAT.cyan, 0, .03, 0, g, false); for (let i = 0; i < 6; i++) for (const s of [-1, 1]) mk(RB(.025, .02, .08, .006, 1), MAT.gold, -.13 + i * .052, -.01, s * .21, g); g.rotation.x = .5; },
+  gyro: g => { PM.gimbal(g); mk(new THREE.CylinderGeometry(.09, .09, .02, 32), MAT.cyan, 0, 0, 0, g, false).rotation.x = Math.PI / 2; },
+  accel: g => { mk(RB(.14, .14, .14, .03), MAT.dark, 0, 0, 0, g); const rod = () => new THREE.CylinderGeometry(.012, .012, .36, 8); mk(rod(), MAT.red, 0, 0, 0, g).rotation.z = Math.PI / 2; mk(rod(), MAT.gold, 0, 0, 0, g); mk(rod(), MAT.cyan, 0, 0, 0, g, false).rotation.x = Math.PI / 2; },
+  starScanner: g => { const t = mk(new THREE.CylinderGeometry(.08, .1, .3, 28), MAT.dark, 0, .02, 0, g); t.rotation.x = -.6; t.add(mk(new THREE.CylinderGeometry(.075, .075, .01, 28), MAT.window, 0, .151, 0)); t.add(mk(new THREE.CylinderGeometry(.082, .082, .03, 28), MAT.cyan, 0, .12, 0, undefined, false)); mk(RB(.16, .06, .16, .02), MAT.metal, 0, -.15, 0, g); },
+  radar: g => { const m = MAT.white.clone(); m.side = THREE.DoubleSide; const d = mk(new THREE.SphereGeometry(.22, 32, 10, 0, Math.PI * 2, 0, .75), m, 0, .14, 0, g); d.rotation.x = Math.PI + .5; mk(new THREE.CylinderGeometry(.008, .008, .2, 8), MAT.metal, 0, .02, .02, g).rotation.x = .5; mk(new THREE.SphereGeometry(.025, 12, 8), MAT.cyan, 0, .1, .07, g, false); mk(new THREE.CylinderGeometry(.03, .05, .14, 16), MAT.dark, 0, -.12, 0, g); },
+  lidar: g => { mk(new THREE.CylinderGeometry(.11, .11, .2, 32), MAT.dark, 0, 0, 0, g); mk(new THREE.CylinderGeometry(.112, .112, .05, 32), MAT.cyan, 0, .02, 0, g, false); mk(new THREE.CylinderGeometry(.08, .11, .06, 32), MAT.metal, 0, .13, 0, g); mk(new THREE.CylinderGeometry(.12, .12, .04, 32), MAT.metal, 0, -.12, 0, g); },
+  sunSensor: g => { mk(RB(.2, .08, .2, .02), MAT.dark, 0, -.04, 0, g); mk(new THREE.ConeGeometry(.08, .1, 4), MAT.amberGlow, 0, .05, 0, g, false).rotation.y = Math.PI / 4; for (const [x, z] of [[-.07, -.07], [.07, .07]]) mk(new THREE.SphereGeometry(.015, 8, 6), MAT.cyan, x, .01, z, g, false); },
+  antenna: g => { mk(new THREE.CylinderGeometry(.01, .01, .42, 8), MAT.metal, 0, 0, 0, g); for (const y of [-.08, .02, .12]) mk(new THREE.CylinderGeometry(.006, .006, .24 - y * .5, 6), MAT.metal, 0, y, 0, g).rotation.z = Math.PI / 2; mk(new THREE.SphereGeometry(.03, 12, 8), MAT.cyan, 0, .22, 0, g, false); mk(new THREE.CylinderGeometry(.05, .06, .04, 16), MAT.dark, 0, -.21, 0, g); },
+  transmitter: g => { mk(RB(.22, .16, .16, .03), MAT.dark, 0, -.05, 0, g); mk(new THREE.CylinderGeometry(.008, .008, .26, 8), MAT.metal, .06, .16, 0, g); mk(new THREE.SphereGeometry(.02, 10, 8), MAT.cyan, .06, .3, 0, g, false); for (let i = 0; i < 3; i++) mk(new THREE.SphereGeometry(.015, 8, 6), i === 2 ? MAT.orange : MAT.cyan, -.06 + i * .04, -.02, .081, g, false); },
+  tempSensor: g => { mk(new THREE.CapsuleGeometry(.035, .3, 6, 16), MAT.glass, 0, .04, 0, g, false); mk(new THREE.SphereGeometry(.06, 16, 12), MAT.orange, 0, -.16, 0, g, false); mk(new THREE.CylinderGeometry(.012, .012, .25, 8), MAT.orange, 0, 0, 0, g, false); },
+  pressureSensor: g => { mk(new THREE.CylinderGeometry(.13, .13, .05, 40), MAT.metal, 0, 0, 0, g).rotation.x = Math.PI / 2; mk(new THREE.CircleGeometry(.11, 40), MAT.white, 0, 0, .026, g); mk(RB(.012, .09, .006, .003, 1), MAT.red, .02, .02, .032, g).rotation.z = -.8; mk(new THREE.CylinderGeometry(.025, .025, .12, 12), MAT.gold, 0, -.18, 0, g); },
+  neon: g => { for (let i = 0; i < 3; i++) mk(RB(.04, .32, .03, .012), i === 1 ? MAT.green : MAT.cyan, -.1 + i * .1, 0, 0, g, false).rotation.z = (i - 1) * .2; },
+  dataBus: g => { mk(RB(.4, .01, .14, .004, 1), MAT.dark, 0, 0, 0, g); for (let i = 0; i < 6; i++) mk(RB(.4, .012, .008, .003, 1), MAT.gold, 0, .003, -.05 + i * .02, g); for (const x of [-.21, .21]) mk(RB(.05, .04, .16, .01), MAT.metal, x, 0, 0, g); g.rotation.x = .6; },
+  memory: g => { mk(RB(.4, .12, .012, .004, 1), MAT.pcb, 0, 0, 0, g); for (let i = 0; i < 4; i++) mk(RB(.07, .06, .012, .004, 1), MAT.dark, -.135 + i * .09, .01, .01, g); for (let i = 0; i < 10; i++) mk(RB(.012, .02, .014, .003, 1), MAT.gold, -.18 + i * .04, -.055, 0, g); },
+  powerCtrl: g => { mk(RB(.24, .24, .12, .03), MAT.dark, 0, 0, 0, g); for (const x of [-.05, .05]) mk(RB(.03, .06, .03, .01), MAT.metal, x, .03, .07, g); mk(new THREE.SphereGeometry(.02, 10, 8), MAT.green, -.07, -.07, .061, g, false); mk(new THREE.SphereGeometry(.02, 10, 8), MAT.orange, .07, -.07, .061, g, false); },
+  panel: g => { const p = mk(RB(.36, .24, .04, .02), MAT.dark, 0, 0, 0, g); p.rotation.x = -.4; p.add(mk(RB(.2, .12, .01, .004, 1), MAT.cyan, -.04, .03, .022, undefined, false)); [MAT.green, MAT.orange, MAT.cyan].forEach((m, i) => p.add(mk(new THREE.SphereGeometry(.016, 10, 8), m, .12, .06 - i * .05, .022, undefined, false))); },
+  autopilot: g => { PM.computer(g); mk(new THREE.SphereGeometry(.06, 24, 16), MAT.cyan, 0, .17, 0, g, false); mk(new THREE.TorusGeometry(.09, .008, 8, 32), MAT.metal, 0, .17, 0, g).rotation.x = 1.2; },
+  o2: g => { for (const s of [-1, 1]) { mk(new THREE.CapsuleGeometry(.075, .2, 8, 20), MAT.white, s * .09, 0, 0, g); mk(new THREE.CylinderGeometry(.078, .078, .04, 20), MAT.cyan, s * .09, .04, 0, g, false); } mk(RB(.32, .04, .1, .015), MAT.dark, 0, .21, 0, g); },
+  co2: g => { mk(new THREE.CylinderGeometry(.11, .11, .32, 32), MAT.white, 0, 0, 0, g); for (const y of [-.1, -.04, .02, .08]) mk(new THREE.TorusGeometry(.112, .008, 6, 32), MAT.dark, 0, y, 0, g).rotation.x = Math.PI / 2; mk(new THREE.CylinderGeometry(.05, .05, .04, 16), MAT.metal, 0, .18, 0, g); mk(new THREE.CylinderGeometry(.113, .113, .03, 32), MAT.green, 0, .13, 0, g, false); },
+  regenerator: g => { mk(RB(.28, .2, .18, .03), MAT.white, 0, 0, 0, g); mk(new THREE.CylinderGeometry(.07, .07, .01, 24), MAT.cyan, 0, 0, .091, g, false).rotation.x = Math.PI / 2; for (const x of [-.1, .1]) mk(new THREE.CylinderGeometry(.025, .025, .12, 12), MAT.metal, x, .15, 0, g); },
+  solar: g => { mk(RB(.46, .018, .3, .006, 1), MAT.solar, 0, .02, 0, g).rotation.x = -.5; mk(new THREE.CylinderGeometry(.02, .02, .22, 8), MAT.metal, 0, -.1, 0, g); },
+  deployDrive: g => { mk(new THREE.CylinderGeometry(.08, .08, .2, 24), MAT.dark, -.06, 0, 0, g).rotation.z = Math.PI / 2; mk(new THREE.CylinderGeometry(.1, .1, .04, 24), MAT.gold, .08, 0, 0, g).rotation.z = Math.PI / 2; for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; mk(RB(.04, .035, .03, .008, 1), MAT.gold, .08, Math.cos(a) * .11, Math.sin(a) * .11, g).rotation.x = -a; } },
+  battery: g => { mk(RB(.2, .3, .14, .03), MAT.dark, 0, 0, 0, g); mk(new THREE.CylinderGeometry(.03, .03, .04, 12), MAT.metal, .05, .17, 0, g); mk(new THREE.CylinderGeometry(.03, .03, .04, 12), MAT.red, -.05, .17, 0, g); for (let i = 0; i < 3; i++) mk(RB(.12, .04, .01, .004, 1), MAT.green, 0, -.08 + i * .06, .071, g, false); },
+  heatPlate: g => { mk(new THREE.CylinderGeometry(.2, .2, .05, 6), AM.under, 0, 0, 0, g).rotation.x = 1.2; mk(new THREE.CylinderGeometry(.12, .12, .055, 6), MAT.orange, 0, 0, 0, g, false).rotation.x = 1.2; },
+  window: g => { mk(new THREE.TorusGeometry(.15, .035, 14, 40), MAT.metal, 0, 0, 0, g); mk(new THREE.SphereGeometry(.15, 32, 16), MAT.window, 0, 0, 0, g).scale.z = .25; g.rotation.x = -.3; },
+  hatch: g => { mk(new THREE.CylinderGeometry(.18, .18, .05, 40), MAT.white, 0, 0, 0, g).rotation.x = Math.PI / 2; mk(new THREE.TorusGeometry(.17, .015, 8, 40), MAT.dark, 0, 0, .026, g); mk(new THREE.TorusGeometry(.07, .012, 8, 24), MAT.red, 0, 0, .05, g); for (let k = 0; k < 3; k++) mk(RB(.14, .012, .012, .004, 1), MAT.red, 0, 0, .05, g).rotation.z = k * Math.PI / 3; g.rotation.x = -.4; },
+  seal: g => { mk(new THREE.TorusGeometry(.15, .045, 16, 48), AM.under, 0, 0, 0, g).rotation.x = 1.1; mk(new THREE.TorusGeometry(.2, .006, 8, 48), MAT.cyan, 0, 0, 0, g, false).rotation.x = 1.1; },
+  seat: g => { mk(RB(.24, .06, .22, .02), MAT.dark, 0, -.1, .02, g); mk(RB(.24, .3, .06, .02), MAT.dark, 0, .05, -.09, g).rotation.x = -.25; mk(RB(.12, .08, .05, .02), MAT.white, 0, .24, -.13, g); for (const s of [-1, 1]) mk(RB(.03, .06, .2, .01), MAT.red, s * .13, -.05, .02, g); },
+  heater: g => { mk(RB(.3, .22, .08, .02), MAT.dark, 0, 0, -.02, g); for (let i = 0; i < 4; i++) mk(new THREE.CylinderGeometry(.012, .012, .26, 8), MAT.orange, 0, -.07 + i * .047, .03, g, false).rotation.z = Math.PI / 2; },
+  waterTank: g => { mk(new THREE.CapsuleGeometry(.11, .16, 8, 24), MAT.white, 0, 0, 0, g); mk(new THREE.CylinderGeometry(.113, .113, .08, 24), MAT.solar, 0, 0, 0, g); mk(new THREE.CylinderGeometry(.025, .025, .06, 12), MAT.metal, 0, .22, 0, g); },
+  firstAid: g => { mk(RB(.28, .2, .12, .03), MAT.white, 0, 0, 0, g); mk(RB(.12, .035, .01, .006, 1), MAT.red, 0, 0, .061, g); mk(RB(.035, .12, .01, .006, 1), MAT.red, 0, 0, .061, g); mk(RB(.1, .03, .03, .012), MAT.dark, 0, .115, 0, g); },
+  crystal: g => { mk(new THREE.OctahedronGeometry(.13, 0), MAT.cyan, 0, 0, 0, g, false).scale.y = 2.1; for (const [x, z, s] of [[.12, .04, .6], [-.1, -.05, .5]]) mk(new THREE.OctahedronGeometry(.1, 0), MAT.purple, x, -.12, z, g, false).scale.set(s, s * 1.8, s); },
+  purifier: g => { mk(new THREE.CylinderGeometry(.11, .11, .26, 32), MAT.glass, 0, 0, 0, g, false); mk(new THREE.OctahedronGeometry(.06, 0), MAT.cyan, 0, 0, 0, g, false).scale.y = 1.8; for (const y of [-.14, .14]) mk(new THREE.CylinderGeometry(.12, .12, .03, 32), MAT.metal, 0, y, 0, g); mk(new THREE.CylinderGeometry(.02, .02, .14, 8), MAT.metal, .14, 0, 0, g).rotation.z = Math.PI / 2; },
+  fairing: g => { mk(lathe([[.16, -.2], [.155, -.08], [.12, .06], [.06, .18], [0, .24]], 40), MAT.red, 0, 0, 0, g); mk(new THREE.CylinderGeometry(.165, .165, .03, 40), MAT.metal, 0, -.21, 0, g); },
+  launchSystem: g => { mk(RB(.28, .14, .2, .03), MAT.dark, 0, -.06, 0, g); mk(new THREE.CylinderGeometry(.06, .07, .05, 32), MAT.red, 0, .03, .02, g); mk(new THREE.TorusGeometry(.075, .01, 8, 32), MAT.amberGlow, 0, .01, .02, g, false).rotation.x = Math.PI / 2; mk(RB(.06, .012, .01, .004, 1), MAT.cyan, -.08, -.04, .101, g, false); },
+  key: g => { mk(new THREE.TorusGeometry(.07, .022, 12, 32), MAT.gold, 0, .12, 0, g); mk(RB(.03, .26, .03, .01), MAT.gold, 0, -.07, 0, g); for (const [y, w] of [[-.15, .07], [-.09, .05]]) mk(RB(w, .025, .03, .008), MAT.gold, w / 2, y, 0, g); mk(new THREE.SphereGeometry(.025, 12, 8), MAT.cyan, 0, .12, 0, g, false); },
+};
+function partModel(n) {
+  const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
+  (PM[PARTS[n - 1][1]] || PM.crystal)(inner);
+  const box = new THREE.Box3().setFromObject(inner), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  const k = .46 / Math.max(size.x, size.y, size.z, .01);
+  inner.scale.multiplyScalar(k); inner.position.sub(c.multiplyScalar(k));
+  return g;
+}
+
+/* ---------------- board ---------------- */
+let board = null, tiles = new Map(), pickups = new Map(), level = null, A = null, ROCKET = null, SKY = null, chevron = null;
+const TOP = h => h * .5;
+const COL_GEO = {};
+const colGeo = hgt => COL_GEO[hgt] || (COL_GEO[hgt] = RB(.96, hgt, .96, .07, 3));
+let craterRimGeo, craterBowlGeo, plateGeo, unstableGeo, dotGeo, beamGeo, ringGeo, discGeo, rockGeos;
+function buildSharedGeos() {
+  const sh = new THREE.Shape(); sh.moveTo(-.48, -.48); sh.lineTo(.48, -.48); sh.lineTo(.48, .48); sh.lineTo(-.48, .48); sh.lineTo(-.48, -.48);
+  const hole = new THREE.Path(); hole.absarc(0, 0, .37, 0, Math.PI * 2, true); sh.holes.push(hole);
+  craterRimGeo = new THREE.ExtrudeGeometry(sh, { depth: .3, bevelEnabled: true, bevelThickness: .03, bevelSize: .03, bevelSegments: 3, curveSegments: 40 });
+  craterRimGeo.rotateX(-Math.PI / 2); craterRimGeo.translate(0, -.33, 0);
+  craterBowlGeo = lathe([[0, -.3], [.14, -.29], [.26, -.22], [.34, -.1], [.38, 0], [.41, .02]], 40);
+  plateGeo = RB(.45, .12, .45, .03);
+  unstableGeo = RB(.92, .12, .92, .04);
+  dotGeo = new THREE.SphereGeometry(.045, 14, 10);
+  beamGeo = new THREE.CylinderGeometry(.4, .4, 2.6, 32, 1, true);
+  ringGeo = new THREE.TorusGeometry(.3, .022, 10, 48);
+  discGeo = new THREE.CylinderGeometry(.27, .29, .04, 40);
+  rockGeos = [lumpyRock(11), lumpyRock(12), lumpyRock(13)];
+}
+const cellPos = (x, z, h) => new THREE.Vector3(x - (level.w - 1) / 2, TOP(h), z - (level.d - 1) / 2);
+function buildBoard() {
+  if (board) { scene.remove(board); board.traverse(o => { if (o.isMesh && o.userData.own) o.material.dispose(); }); }
+  board = new THREE.Group(); scene.add(board); tiles = new Map(); pickups = new Map();
+  const r = rng(level.n * 31 + 5);
+  for (const [k, c] of level.cells) {
+    const g = new THREE.Group(); g.position.copy(cellPos(c.x, c.z, 0)); board.add(g);
+    const top = TOP(c.h), rec = { g, c };
+    const mat = c.type === 'radiation' ? MAT.rad : MAT.tile[Math.floor(r() * 3)];
+    const colTop = c.type === 'crater' ? top - .36 : c.type === 'cracked' ? top - .12 : c.type === 'unstable' ? top - .14 : top;
+    const col = mk(colGeo(+(colTop + 1.2).toFixed(2)), mat, 0, (colTop - 1.2) / 2, 0, g); col.rotation.y = Math.floor(r() * 4) * Math.PI / 2;
+    if (c.type === 'crater') {
+      mk(craterRimGeo, mat, 0, top, 0, g);
+      mk(craterBowlGeo, MAT.crater, 0, top - .03, 0, g, false);
+    } else if (c.type === 'rock') {
+      const rk = mk(rockGeos[Math.floor(r() * 3)], MAT.rock, 0, top + .14, 0, g); rk.scale.setScalar(.33 + r() * .06); rk.rotation.y = r() * 6;
+    } else if (c.type === 'start') {
+      mk(discGeo, MAT.metal, 0, top + .02, 0, g);
+      mk(ringGeo, MAT.cyan, 0, top + .03, 0, g, false).rotation.x = Math.PI / 2;
+    } else if (c.type === 'cracked') {
+      const glow = mk(new THREE.PlaneGeometry(.9, .9), MAT.amberGlow, 0, top - .118, 0, g, false); glow.rotation.x = -Math.PI / 2;
+      rec.plates = [];
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const p = mk(plateGeo, mat, sx * .238, top - .06 - r() * .02, sz * .238, g);
+        p.rotation.set((r() - .5) * .1, r() * .2, (r() - .5) * .1); p.userData.base = { y: p.position.y, rx: p.rotation.x, rz: p.rotation.z }; rec.plates.push(p);
+      }
+    } else if (c.type === 'unstable') {
+      const glow = mk(new THREE.PlaneGeometry(.88, .88), MAT.amberGlow, 0, top - .135, 0, g, false); glow.rotation.x = -Math.PI / 2;
+      rec.plate = mk(unstableGeo, MAT.stripe, 0, top - .06, 0, g); rec.plateY = top - .06;
+    } else if (c.type === 'radiation') {
+      mk(new THREE.TorusGeometry(.32, .02, 8, 48), MAT.purple, 0, top + .01, 0, g, false).rotation.x = Math.PI / 2;
+      mk(new THREE.CylinderGeometry(.12, .15, .08, 24), MAT.dark, 0, top + .04, 0, g);
+      rec.emit = mk(new THREE.OctahedronGeometry(.08, 0), MAT.purple.clone(), 0, top + .28, 0, g, false); rec.emit.scale.y = 1.8; rec.emit.userData.own = true;
+      rec.beamMat = beamMat(); const beam = new THREE.Mesh(beamGeo, rec.beamMat); beam.userData.own = true; beam.position.y = top + 1.3; g.add(beam); rec.beam = beam;
+    }
+    if (c.p) {
+      rec.dots = [];
+      for (let i = 0; i < c.p; i++) { const m = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x2fe08f, emissiveIntensity: 1.5 }); const d = mk(dotGeo, m, (i - (c.p - 1) / 2) * .14, top + .05, .44, g, false); d.userData.own = true; rec.dots.push(d); }
+    }
+    tiles.set(k, rec);
+  }
+  for (const k of level.pickups) {
+    const c = level.cells.get(k), g = new THREE.Group(); g.position.copy(cellPos(c.x, c.z, c.h)); board.add(g);
+    const ring = mk(new THREE.TorusGeometry(.32, .018, 8, 48), MAT.cyan, 0, .03, 0, g, false); ring.rotation.x = Math.PI / 2;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.dot, color: 0x62e3ff, transparent: true, opacity: .35, depthWrite: false, blending: THREE.AdditiveBlending })); halo.scale.setScalar(1.1); halo.position.y = .55; g.add(halo);
+    const item = partModel(level.n); item.position.y = .55; g.add(item);
+    pickups.set(k, { g, item, ring, halo, phase: Math.random() * 6 });
+  }
+  chevron = new THREE.Group(); const cone = new THREE.Mesh(new THREE.ConeGeometry(.12, .24, 3), MAT.cyan); cone.rotation.x = Math.PI / 2; chevron.add(cone); board.add(chevron);
+}
+
+/* ---------------- tweens & fx ---------------- */
+const tweens = []; const fx = [];
+const ease = { io: t => t < .5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2, out: t => 1 - (1 - t) ** 3, in: t => t * t * t, lin: t => t };
+function tween(dur, fn, e = ease.io) { return new Promise(res => tweens.push({ t: 0, dur: Math.max(.001, dur), fn, e, res })); }
+function clearTweens() { while (tweens.length) { const tw = tweens.pop(); tw.res(); } }
+const wait = s => tween(s, () => { });
+function burst(pos, color = 0x62e3ff, n = 34, spread = 2.2, size = .14) {
+  const g = new THREE.BufferGeometry(), p = new Float32Array(n * 3), v = [];
+  for (let i = 0; i < n; i++) { p.set([pos.x, pos.y, pos.z], i * 3); const d = new THREE.Vector3(Math.random() - .5, Math.random() * .9 + .1, Math.random() - .5).normalize().multiplyScalar(spread * (.4 + Math.random() * .6)); v.push(d); }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const m = new THREE.PointsMaterial({ color, size, map: T.dot, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const pts = new THREE.Points(g, m); scene.add(pts); let life = 0;
+  fx.push(dt => { life += dt; for (let i = 0; i < n; i++) { v[i].y -= dt * 1.6; p[i * 3] += v[i].x * dt; p[i * 3 + 1] += v[i].y * dt; p[i * 3 + 2] += v[i].z * dt; } g.attributes.position.needsUpdate = true; m.opacity = Math.max(0, 1 - life / 1.1); if (life > 1.1) { scene.remove(pts); g.dispose(); m.dispose(); return false; } return true; });
+}
+
+/* ---------------- game state ---------------- */
+let screen = 'loading', cinematic = false, running = false, runId = 0, speed = 1, tick = 0, gotCount = 0;
+let program = { main: [], F1: [], F2: [] }, activeRow = 'main', execMark = null, menuStage = 0;
+let camGoal = null;
+const DUR = { F: .42, J: .55, L: .3, R: .3, W: .38 };
+const $ = id => document.getElementById(id);
+
+function placeAstronaut(x, z, h, dir) {
+  A.root.position.copy(cellPos(x, z, h)); A.root.rotation.set(0, [Math.PI / 2, 0, -Math.PI / 2, Math.PI][dir], 0);
+  A.root.scale.setScalar(1); A.root.visible = true; A.moving = 0; A.cheer = 0;
+}
+function updateChevron(st) {
+  if (!chevron) return;
+  const show = !running && screen === 'game' && !cinematic;
+  chevron.visible = show; if (!show) return;
+  const p = cellPos(st.x + DIRS[st.dir][0] * .62, st.z + DIRS[st.dir][1] * .62, st.h);
+  chevron.position.set(p.x, p.y + .04, p.z);
+  chevron.rotation.set(0, [Math.PI / 2, 0, -Math.PI / 2, Math.PI][st.dir], 0);
+}
+function setHazards(t, instant) {
+  for (const rec of tiles.values()) {
+    const c = rec.c; if (!c.p) continue;
+    const dng = danger(c, t);
+    if (rec.plate) { const from = rec.plate.position.y, to = dng ? rec.plateY - .5 : rec.plateY; if (instant) rec.plate.position.y = to; else tween(.22 / speed, k => rec.plate.position.y = from + (to - from) * k); }
+    if (rec.beamMat) { const from = rec.beamMat.uniforms.uOpacity.value, to = dng ? 1 : .05; if (instant) rec.beamMat.uniforms.uOpacity.value = to; else tween(.2 / speed, k => rec.beamMat.uniforms.uOpacity.value = from + (to - from) * k); rec.emit.material.emissiveIntensity = dng ? 7 : 2; }
+    rec.dots.forEach((d, i) => { const bad = danger(c, t + 1 + i); d.material.emissive.setHex(bad ? (c.type === 'unstable' ? 0xff9a2e : 0xff3d6e) : 0x2fe08f); d.material.emissiveIntensity = bad ? 3 : 1.2; d.scale.setScalar(i === 0 ? 1.35 : 1); });
+  }
+}
+function resetBoard() {
+  for (const rec of tiles.values()) {
+    if (rec.plates) rec.plates.forEach(p => { p.visible = true; p.position.y = p.userData.base.y; p.rotation.x = p.userData.base.rx; p.rotation.z = p.userData.base.rz; });
+  }
+  for (const pk of pickups.values()) { pk.g.visible = true; pk.item.scale.setScalar(1); pk.item.position.y = .55; pk.halo.material.opacity = .35; }
+  setHazards(0, true); tick = 0; gotCount = 0;
+  placeAstronaut(level.start.x, level.start.z, level.cells.get(K(level.start.x, level.start.z)).h, level.start.dir);
+  updateChevron({ x: level.start.x, z: level.start.z, h: level.cells.get(K(level.start.x, level.start.z)).h, dir: level.start.dir });
+  hud();
+}
+function frameBoard(animate = true) {
+  const R = Math.hypot(level.w, level.d) / 2 + .8;
+  const vf = camera.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect);
+  const dist = R / Math.sin(Math.min(vf, hf) / 2) * 1.02;
+  const target = new THREE.Vector3(0, .3, 0);
+  const dir = new THREE.Vector3(Math.sin(.75) * Math.sin(1.0), Math.cos(1.0), Math.cos(.75) * Math.sin(1.0)).normalize();
+  const pos = target.clone().addScaledVector(dir, dist);
+  controls.minDistance = dist * .45; controls.maxDistance = dist * 1.7;
+  if (animate) return flyTo(pos, target, 1.2); camera.position.copy(pos); controls.target.copy(target); controls.update();
+}
+function flyTo(pos, target, dur) {
+  const p0 = camera.position.clone(), t0 = controls.target.clone(); controls.enabled = false;
+  return tween(dur, k => { camera.position.lerpVectors(p0, pos, k); controls.target.lerpVectors(t0, target, k); camera.lookAt(controls.target); }).then(() => { controls.enabled = true; });
+}
+
+/* ---------------- UI ---------------- */
+function hud() {
+  if (!level) return;
+  $('hudLevel').textContent = t('level') + ' ' + level.n;
+  $('hudStage').textContent = t('seeking', partName(level.n));
+  $('hudParts').querySelector('span').textContent = `${gotCount}/${level.pickups.length}`;
+  $('hudTick').textContent = t('tick') + ' ' + tick;
+}
+function rowsFor() { return ['main', 'F1', 'F2'].filter(r => r === 'main' || level.limits[r] > 0); }
+function renderProgram() {
+  const rows = $('rows'); rows.innerHTML = '';
+  for (const r of rowsFor()) {
+    const lim = r === 'main' ? level.limits.main : level.limits[r];
+    const row = document.createElement('div'); row.className = 'prow' + (r === activeRow ? ' active' : ''); row.dataset.row = r;
+    const lab = document.createElement('button'); lab.className = 'plabel'; lab.setAttribute('aria-label', r === 'main' ? t('editMain') : t('editFn', r));
+    lab.innerHTML = `<b style="color:${r === 'main' ? 'var(--ink)' : CMD[r].c}">${r === 'main' ? t('mainLabel') : r}</b><span>${program[r].length}/${lim}</span>`;
+    lab.onclick = () => { activeRow = r; renderProgram(); };
+    const slots = document.createElement('div'); slots.className = 'slots';
+    for (let i = 0; i < lim; i++) {
+      const c = program[r][i], s = document.createElement('button');
+      s.className = 'slot' + (c ? ' filled' : ''); if (c) { s.style.setProperty('--c', CMD[c].c); s.innerHTML = icon(c); s.setAttribute('aria-label', cmdName(c) + t('remove')); }
+      else s.setAttribute('aria-label', t('emptySlot'));
+      if (execMark && execMark.row === r && execMark.idx === i) s.classList.add('exec');
+      s.onclick = () => { if (running) return; activeRow = r; if (c) { program[r].splice(i, 1); saveDraft(); } renderProgram(); };
+      slots.appendChild(s);
+    }
+    row.onclick = e => { if (e.target === row || e.target === slots) { activeRow = r; renderProgram(); } };
+    row.append(lab, slots); rows.appendChild(row);
+  }
+  renderPalette();
+}
+function renderPalette() {
+  const p = $('palette'); p.innerHTML = '';
+  for (const c of level.cmds) {
+    const b = document.createElement('button'); b.className = 'cmd'; b.style.setProperty('--c', CMD[c].c); b.innerHTML = icon(c); b.title = cmdName(c); b.setAttribute('aria-label', cmdName(c));
+    b.disabled = running || (activeRow === 'F1' && c === 'F1') || (activeRow === 'F2' && (c === 'F1' || c === 'F2'));
+    b.onclick = () => {
+      const lim = level.limits[activeRow];
+      if (program[activeRow].length >= lim) { const row = document.querySelector(`.prow[data-row="${activeRow}"]`); row.classList.remove('shake'); void row.offsetWidth; row.classList.add('shake'); return; }
+      program[activeRow].push(c); saveDraft(); renderProgram();
+    };
+    p.appendChild(b);
+  }
+  const run = $('btnRun');
+  run.className = 'primary' + (running ? ' stop' : '');
+  run.innerHTML = running ? '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>' + t('stop') : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>' + t('run');
+  $('btnClear').disabled = running;
+}
+function saveDraft() { save.drafts[level.n] = program; persist(); }
+function toast(html) { if (!html) { $('toast').hidden = true; return; } $('toastText').innerHTML = html; $('toast').hidden = false; }
+$('toastClose').onclick = () => toast(null);
+const starSvg = on => `<svg viewBox="0 0 24 24" fill="${on ? 'var(--amber)' : 'rgba(150,180,230,.18)'}" style="${on ? 'filter:drop-shadow(0 0 8px var(--amber))' : ''}"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4L2.8 9.5l6.4-.8z"/></svg>`;
+function modal(html, buttons) {
+  const card = $('card'); card.innerHTML = html;
+  const row = document.createElement('div'); row.className = 'row';
+  for (const b of buttons) { const el = document.createElement('button'); el.className = b.primary ? 'primary' : 'ghost'; el.textContent = b.label; el.onclick = () => { $('modal').hidden = true; b.fn && b.fn(); }; row.appendChild(el); }
+  card.appendChild(row); $('modal').hidden = false; row.querySelector('.primary, .ghost')?.focus();
+}
+
+/* ---------------- execution ---------------- */
+function* expand(row, depth = 0) {
+  for (let i = 0; i < program[row].length; i++) {
+    const c = program[row][i];
+    if (c === 'F1' || c === 'F2') { yield { call: true, row, idx: i }; if (depth < 3) yield* expand(c, depth + 1); }
+    else yield { cmd: c, row, idx: i };
+  }
+}
+function markExec(row, idx) { execMark = row ? { row, idx } : null; document.querySelectorAll('.slot.exec').forEach(s => s.classList.remove('exec')); if (!row) return; const s = document.querySelectorAll(`.prow[data-row="${row}"] .slot`)[idx]; s && s.classList.add('exec'); }
+async function animStep(res, id) {
+  const sp = speed, d = DUR[res.cmd] / sp;
+  const p0 = cellPos(res.from.x, res.from.z, res.from.h);
+  const rot0 = A.root.rotation.y;
+  if (res.cmd === 'L' || res.cmd === 'R') {
+    let rot1 = [Math.PI / 2, 0, -Math.PI / 2, Math.PI][res.to.dir], dr = ((rot1 - rot0 + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    await tween(d, k => A.root.rotation.y = rot0 + dr * k);
+    return;
+  }
+  if (res.cmd === 'W') { await tween(d, k => { A.root.scale.y = 1 - Math.sin(k * Math.PI) * .05; }); A.root.scale.y = 1; return; }
+  const p1 = cellPos(res.to.x, res.to.z, res.to.h);
+  const fail = res.fail && res.fail.type;
+  const blockFail = fail === 'rock' || fail === 'wall' || fail === 'ledge' || fail === 'jump';
+  const fallFail = fail === 'void' || fail === 'crater' || fail === 'broken';
+  if (blockFail) {
+    A.moving = 1;
+    await tween(d * .45, k => { A.root.position.lerpVectors(p0, p1, k * .32); A.walk += .25; });
+    await tween(d * .45, k => { A.root.position.lerpVectors(p0, p1, (1 - k) * .32); A.root.position.x += Math.sin(k * 30) * .02 * (1 - k); });
+    A.moving = 0; return;
+  }
+  const jump = res.cmd === 'J', top = Math.max(p0.y, p1.y) + .45;
+  A.moving = jump ? 0 : 1;
+  if (jump) await tween(d * .2, k => A.root.scale.y = 1 - .12 * k);
+  if (id !== runId) return;
+  await tween(fallFail ? d * .75 : d, k => {
+    const q = fallFail ? k * .78 : k;
+    A.root.position.lerpVectors(p0, p1, q);
+    if (jump) { A.root.position.y = p0.y + (p1.y - p0.y) * q + Math.sin(q * Math.PI) * (top - Math.max(p0.y, p1.y) + Math.abs(p1.y - p0.y) * .5); A.root.scale.y = .88 + .12 * Math.min(1, k * 3); A.cheer = Math.sin(k * Math.PI) * .35; }
+    else A.walk += .22 * sp;
+  }, jump ? ease.io : ease.lin);
+  A.moving = 0; A.cheer = 0; A.root.scale.y = 1;
+  if (res.broke) breakTile(res.broke);
+}
+function breakTile(k) {
+  const rec = tiles.get(k); if (!rec || !rec.plates) return;
+  burst(rec.g.position.clone().add(new THREE.Vector3(0, TOP(rec.c.h), 0)), 0xffa64a, 18, 1.2, .1);
+  rec.plates.forEach((p, i) => { const y0 = p.position.y, rx = (Math.random() - .5) * 2; tween(.9, k2 => { p.position.y = y0 - k2 * k2 * 2.2; p.rotation.x = p.userData.base.rx + rx * k2; }, ease.lin).then(() => p.visible = false); });
+}
+async function failAnim(res) {
+  const t = res.fail.type;
+  if (t === 'void' || t === 'crater' || t === 'broken' || t === 'plate') {
+    const p = A.root.position.clone(), dx = (Math.random() - .5);
+    await tween(.9, k => { A.root.position.y = p.y - k * k * (t === 'crater' ? 1.4 : 4); A.root.rotation.x = k * dx * 2; A.root.scale.setScalar(1 - k * .6); }, ease.lin);
+    A.root.visible = false;
+  } else if (t === 'radiation') {
+    burst(A.root.position.clone().add(new THREE.Vector3(0, .5, 0)), 0xc070ff, 50, 2.6, .16);
+    await tween(.8, k => { A.root.scale.setScalar(1 + Math.sin(k * 20) * .05 * (1 - k)); });
+  } else await wait(.2);
+}
+async function run() {
+  if (running) { stopRun(); return; }
+  if (!program.main.length) { toast(t('emptyProg')); return; }
+  toast(null); resetBoard();
+  running = true; const id = ++runId; renderPalette(); updateChevron({ x: 0, z: 0, h: 0, dir: 0 });
+  const st = newRun(level); let steps = 0;
+  for (const it of expand('main')) {
+    if (id !== runId) return;
+    markExec(it.row, it.idx);
+    if (it.call) { await wait(.12 / speed); continue; }
+    if (++steps > 400) break;
+    const res = step(level, st, it.cmd);
+    await animStep(res, id); if (id !== runId) return;
+    if (!res.fail || res.fail.type === 'plate' || res.fail.type === 'radiation') { tick = st.t; setHazards(tick, false); }
+    if (res.got) collect(res.got);
+    hud();
+    if (res.fail) { if (res.fail.type === 'plate') await wait(.25 / speed); await failAnim(res); if (id !== runId) return; return endRun(false, FAIL()[res.fail.type]); }
+    if (st.got.size === level.pickups.length) { await wait(.2); return endRun(true); }
+  }
+  if (id !== runId) return;
+  endRun(false, t('incomplete', st.got.size, level.pickups.length));
+}
+function collect(k) {
+  const pk = pickups.get(k); if (!pk) return; gotCount++;
+  const chip = $('hudParts'); chip.classList.remove('pulse'); void chip.offsetWidth; chip.classList.add('pulse');
+  const wp = pk.g.position.clone().add(new THREE.Vector3(0, .55, 0)); burst(wp, 0x62e3ff, 40, 2, .13);
+  const y0 = pk.item.position.y;
+  tween(.6, q => { pk.item.position.y = y0 + q * 1.2; pk.item.scale.setScalar(1 - q * .9); pk.halo.material.opacity = .35 * (1 - q); }, ease.out).then(() => { pk.g.visible = false; });
+}
+function stopRun() { runId++; running = false; clearTweens(); markExec(null); resetBoard(); renderProgram(); }
+function endRun(ok, msg) {
+  running = false; markExec(null); renderPalette();
+  if (!ok) {
+    modal(`<p class="eyebrow" style="color:var(--danger)">${t('failEyebrow', tick)}</p><h2>${t('tryAgain')}</h2><p>${msg}</p>`, [{ label: t('backToProgram'), primary: true, fn: () => { resetBoard(); renderProgram(); } }]);
+    return;
+  }
+  onSuccess();
+}
+async function onSuccess() {
+  const n = level.n, used = program.main.length + program.F1.length + program.F2.length;
+  const stars = used <= level.optimal ? 3 : used <= level.optimal + 2 ? 2 : 1;
+  const first = !save.done[n]; save.done[n] = Math.max(save.done[n] || 0, stars); persist();
+  cinematic = true; A.cheer = 1; burst(A.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xffd36a, 60, 3, .12);
+  const hy = A.root.position.y; await tween(.9, k => { A.root.position.y = hy + Math.sin(k * Math.PI) * .35; }); A.root.position.y = hy;
+  A.cheer = 0;
+  const s = level.stage - 1, st = ROCKET.stages[s], from = Math.max(0, st.p), to = stageProgress(s);
+  if (n === 100 && first) { await rewardShot(s, false); cinematic = false; return launchSequence(); }
+  if (n % 20 === 0 && first) await rewardShot(s);
+  else if (to !== from) tween(1.4, k => setStage(st, from + (to - from) * k, true));
+  cinematic = false;
+  const reward = n % 20 === 0 ? `<div class="reward"><b>${t('stageReward', level.stage)}</b>${ST()[s].reward}</div>` : '';
+  modal(`<p class="eyebrow">${t('levelDone', n)}</p><h2>${t('partInBag')}</h2>
+    <div class="stars">${[0, 1, 2].map(i => starSvg(i < stars)).join('')}</div>
+    <div class="partline"><i></i><span>${partName(n)}</span></div><div class="fact"><b>${t('didYouKnow')}</b>${partFact(n)}</div>${reward}
+    <p class="stat">${t('stat', used, level.optimal)}</p>`,
+    [{ label: t('menu'), fn: showMenu }, { label: t('replay'), fn: () => { resetBoard(); renderProgram(); } }, ...(n < 100 ? [{ label: t('next'), primary: true, fn: () => openLevel(n + 1) }] : [])]);
+}
+function caption(title, line) {
+  const c = $('caption'); if (!title) { c.hidden = true; return; }
+  c.innerHTML = `<b>${title}</b>${line ? `<span>${line}</span>` : ''}`; c.hidden = false;
+}
+// All 20 parts of a stage pop up around the pad, then fly in one by one and the stage builds from the bottom up.
+async function assembleStage(s) {
+  const st = ROCKET.stages[s], rp = ROCKET.root.position.clone();
+  caption(t('capStage', s + 1, ST()[s].name), t('capFlying'));
+  await flyTo(rp.clone().add(new THREE.Vector3(6.8, 3.6, 7.8)), rp.clone().add(new THREE.Vector3(0, 2.1, 0)), 1.6);
+  setStage(st, 0, true); st.ring.visible = true;
+  const parts = [];
+  for (let i = 0; i < 20; i++) {
+    const n = s * 20 + i + 1, m = partModel(n), a = i / 20 * Math.PI * 2 + .3, r0 = 3.4 + (i % 2) * .5;
+    m.position.set(rp.x + Math.cos(a) * r0, .45, rp.z + Math.sin(a) * r0); m.scale.setScalar(0); m.rotation.y = a;
+    m.traverse(o => { if (o.isMesh) o.castShadow = true; }); scene.add(m);
+    const ty = st.minY + (i + .5) / 20 * (st.maxY - st.minY), ta = i * 2.4, tr = Math.max(.25, st.rad * .65);
+    parts.push({ m, n, to: new THREE.Vector3(rp.x + Math.cos(ta) * tr, rp.y + ty, rp.z + Math.sin(ta) * tr) });
+  }
+  parts.forEach((p, i) => setTimeout(() => tween(.4, k => p.m.scale.setScalar(k), ease.out), i * 40));
+  await wait(1.3);
+  let arrived = 0;
+  for (let i = 0; i < 20; i++) {
+    const p = parts[i], from = p.m.position.clone(), r0 = p.m.rotation.y;
+    caption(t('capPart', s + 1, i + 1), partName(p.n));
+    tween(.8, k => {
+      p.m.position.lerpVectors(from, p.to, k); p.m.position.y += Math.sin(k * Math.PI) * 1.4;
+      p.m.rotation.y = r0 + k * 6; p.m.scale.setScalar(1 - k * .6);
+    }, ease.io).then(() => {
+      scene.remove(p.m); p.m.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+      burst(p.to, 0x62e3ff, 22, 1.4, .1);
+      arrived++; setStage(st, arrived / 20, true);
+    });
+    await wait(.3);
+  }
+  await wait(1);
+  setStage(st, 1, true);
+  burst(rp.clone().add(new THREE.Vector3(0, st.maxY, 0)), 0xffd36a, 90, 3.4, .16);
+  caption(t('capDone', s + 1), ST()[s].reward);
+  await wait(2.2);
+  caption(null);
+}
+async function rewardShot(s, back = true) {
+  $('panel').hidden = true; $('hud').hidden = true; toast(null);
+  await assembleStage(s);
+  refreshRocket();
+  if (!back) return;
+  $('panel').hidden = false; $('hud').hidden = false;
+  await frameBoard(true);
+}
+async function replayStage(s) {
+  screen = 'replay'; cinematic = true; $('menu').hidden = true; resizeRenderer();
+  await assembleStage(s);
+  cinematic = false; refreshRocket(); showMenu(); menuStage = s; renderMenu();
+}
+
+/* ---------------- launch (level 100) ---------------- */
+const smoke = [];
+function smokePuff(pos, vel, life, size) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.dot, color: 0xb9bcc6, transparent: true, opacity: .55, depthWrite: false }));
+  s.position.copy(pos); scene.add(s); let t = 0;
+  fx.push(dt => { t += dt; s.position.addScaledVector(vel, dt); vel.multiplyScalar(1 - dt * .6); const k = t / life; s.scale.setScalar(size * (1 + k * 3)); s.material.opacity = .5 * (1 - k); if (k >= 1) { scene.remove(s); s.material.dispose(); return false; } return true; });
+}
+async function launchSequence() {
+  cinematic = true; $('panel').hidden = true; $('hud').hidden = true; toast(null);
+  ROCKET.stages.forEach(st => setStage(st, 1, false));
+  const ap = A.root.position.clone();
+  burst(ap.clone().add(new THREE.Vector3(0, .5, 0)), 0x62e3ff, 60, 2, .14);
+  await tween(.8, k => { A.root.scale.set(1 - k, 1 + k * 1.5, 1 - k); });
+  A.root.visible = false;
+  const rp = ROCKET.root.position.clone();
+  await flyTo(rp.clone().add(new THREE.Vector3(8, 2.2, 9)), rp.clone().add(new THREE.Vector3(0, 2.4, 0)), 2);
+  const big = $('bigText'); big.hidden = false;
+  for (const s of ['3', '2', '1']) { big.textContent = s; await wait(.85); if (s === '1') ROCKET.flames.forEach(f => { f.visible = true; f.scale.set(.3, .2, .3); }); }
+  big.textContent = t('liftoff');
+  ROCKET.nozzleGlows.forEach(g => g.material.emissiveIntensity = 4);
+  let shake = 0;
+  const shakeFx = dt => { if (!cinematic) return false; if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - .5) * shake; camera.position.y += (Math.random() - .5) * shake; } return true; };
+  fx.push(shakeFx);
+  const smoker = dt => { if (!cinematic) return false; const y = ROCKET.root.position.y; if (y < 25 && Math.random() < .9) for (let i = 0; i < 2; i++) { const a = Math.random() * 6.28; smokePuff(new THREE.Vector3(rp.x + Math.cos(a) * .4, y + .2, rp.z + Math.sin(a) * .4), new THREE.Vector3(Math.cos(a) * (2 + Math.random() * 3), Math.random() * 1.2, Math.sin(a) * (2 + Math.random() * 3)), 2.2, .9); } return true; };
+  fx.push(smoker);
+  await tween(1.3, k => { ROCKET.flames.forEach(f => f.scale.set(.3 + k * .7, .2 + k * .8, .3 + k * .7)); ROCKET.engineLight.intensity = k * 60; shake = k * .06; });
+  big.hidden = true;
+  const camStart = camera.position.clone();
+  await tween(7.5, k => {
+    const y = 140 * k ** 2.6; ROCKET.root.position.y = y;
+    controls.target.set(rp.x, 2.4 + y * .92, rp.z);
+    camera.position.set(camStart.x + k * 4, camStart.y + y * .78, camStart.z + k * 6); camera.lookAt(controls.target);
+    shake = .06 * (1 - k); ROCKET.flames.forEach(f => f.scale.y = 1 + k * 1.5);
+  }, ease.lin);
+  cinematic = false;
+  modal(`<p class="eyebrow">${t('finEyebrow')}</p><h2>${t('finH')}</h2>
+    <p>${t('finP')}</p>
+    <div class="reward"><b>${t('summary')}</b>${t('starsTotal', Object.values(save.done).reduce((a, b) => a + b, 0))}</div>`,
+    [{ label: t('toMenu'), primary: true, fn: () => { resetRocket(); showMenu(); } }]);
+}
+function resetRocket() {
+  ROCKET.root.position.copy(ROCKET_POS); ROCKET.flames.forEach(f => f.visible = false); ROCKET.engineLight.intensity = 0;
+  ROCKET.nozzleGlows.forEach(g => g.material.emissiveIntensity = .4); refreshRocket();
+}
+
+/* ---------------- screens ---------------- */
+function openLevel(n) {
+  if (!unlocked(n)) return;
+  stopRunQuiet();
+  level = buildLevel(n); buildBoard();
+  program = save.drafts[n] ? { main: [...save.drafts[n].main || []], F1: [...save.drafts[n].F1 || []], F2: [...save.drafts[n].F2 || []] } : { main: [], F1: [], F2: [] };
+  for (const r of ['main', 'F1', 'F2']) program[r] = program[r].filter(c => level.cmds.includes(c)).slice(0, level.limits[r]);
+  activeRow = 'main'; screen = 'game';
+  $('menu').hidden = true; $('hud').hidden = false; $('panel').hidden = false;
+  resetBoard(); renderProgram(); refreshRocket();
+  toast(HINT(n) || t('levelIntro', partName(n)));
+  requestAnimationFrame(() => { resizeRenderer(); frameBoard(true); });
+}
+function stopRunQuiet() { runId++; running = false; clearTweens(); execMark = null; }
+function showMenu() {
+  stopRunQuiet(); cinematic = false; screen = 'menu';
+  $('hud').hidden = true; $('panel').hidden = true; $('modal').hidden = true; toast(null); $('menu').hidden = false;
+  if (!level) { level = buildLevel(nextLevel()); buildBoard(); resetBoard(); }
+  if (A) A.root.visible = true;
+  refreshRocket();
+  menuStage = Math.min(4, Math.floor((nextLevel() - 1) / 20));
+  resizeRenderer();
+  renderMenu();
+}
+function renderMenu() {
+  const dc = doneCount(), nl = nextLevel();
+  $('pfill').style.width = dc + '%';
+  $('ptext').innerHTML = t('partsCount', dc);
+  const all = dc >= 100;
+  $('btnContinue').textContent = all ? t('watchLaunch') : dc ? t('cont', nl) : t('startMission');
+  $('btnContinue').onclick = () => all ? (openLevel(100), setTimeout(() => { $('menu').hidden = true; launchSequence(); }, 1300)) : openLevel(nl);
+  const tabs = $('stageTabs'); tabs.innerHTML = '';
+  ST().forEach((s, i) => {
+    const b = document.createElement('button'); b.className = 'stab' + (i === menuStage ? ' on' : '');
+    const pr = stageProgress(i);
+    b.innerHTML = `<b>${i + 1}</b><span>${i * 20 + 1}–${i * 20 + 20}</span><div class="mini"><i style="width:${pr * 100}%"></i></div>`;
+    b.setAttribute('aria-label', `${t('stage')} ${i + 1}: ${s.name}`);
+    b.onclick = () => { menuStage = i; renderMenu(); }; tabs.appendChild(b);
+  });
+  const s = ST()[menuStage];
+  $('stageInfo').innerHTML = `<h2>${t('stage')} ${menuStage + 1}. ${s.name}</h2><p><span class="k">${t('goal')}</span>${s.goal}</p><p><span class="k">${t('gameplay')}</span>${s.play}</p><p><span class="k">${t('reward')}</span>${s.reward}</p>${stageProgress(menuStage) >= 1 ? `<button class="replay" id="btnReplay">${t('showAssembly')}</button>` : ''}`;
+  const rb = $('btnReplay'); if (rb) rb.onclick = () => replayStage(menuStage);
+  const grid = $('levelGrid'); grid.innerHTML = '';
+  for (let n = menuStage * 20 + 1; n <= menuStage * 20 + 20; n++) {
+    const b = document.createElement('button'), d = save.done[n] || 0, open = unlocked(n);
+    b.className = 'lv' + (d ? ' done' : '') + (n === nl && !d ? ' next' : '') + (!open ? ' locked' : '') + (n % 20 === 0 ? ' boss' : '');
+    b.innerHTML = `${n}<span class="st">${[0, 1, 2].map(i => `<i class="${i < d ? 'on' : ''}"></i>`).join('')}</span>`;
+    b.title = partName(n); b.setAttribute('aria-label', `${t('level')} ${n}: ${partName(n)}${d ? t('lvDone', d) : open ? '' : t('lvLocked')}`);
+    b.disabled = !open; b.onclick = () => openLevel(n); grid.appendChild(b);
+  }
+}
+$('btnMenu').onclick = showMenu;
+$('btnRun').onclick = run;
+$('btnClear').onclick = () => { if (running) return; program[activeRow] = []; saveDraft(); renderProgram(); };
+$('btnSpeed').onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 3 : 1; $('btnSpeed').textContent = '×' + speed; };
+$('btnReset').onclick = () => modal(`<h2>${t('resetQ')}</h2><p>${t('resetP')}</p>`,
+  [{ label: t('cancel') }, { label: t('resetBtn'), primary: true, fn: () => { save = { done: {}, drafts: {} }; persist(); resetRocket(); level = null; showMenu(); } }]);
+
+/* ---------------- main loop ---------------- */
+const clock = new THREE.Clock(); let menuAng = .6;
+function loop() {
+  const dt = Math.min(clock.getDelta(), .05), time = clock.elapsedTime;
+  for (let i = tweens.length - 1; i >= 0; i--) { const tw = tweens[i]; tw.t += dt; const k = Math.min(1, tw.t / tw.dur); tw.fn(tw.e(k)); if (k >= 1) { tweens.splice(i, 1); tw.res(); } }
+  for (let i = fx.length - 1; i >= 0; i--) if (!fx[i](dt)) fx.splice(i, 1);
+  if (A) animateAstronaut(A, dt, time);
+  for (const pk of pickups.values()) { pk.item.rotation.y += dt * 1.4; if (pk.g.visible && pk.item.scale.x === 1) pk.item.position.y = .55 + Math.sin(time * 2 + pk.phase) * .06; pk.ring.scale.setScalar(1 + Math.sin(time * 3 + pk.phase) * .05); }
+  holoMats.forEach(m => m.uniforms.uTime.value = time);
+  ROCKET.flames.forEach(f => { f.material.uniforms.uTime.value = time; });
+  for (const rec of tiles.values()) { if (rec.beamMat) rec.beamMat.uniforms.uTime.value = time; if (rec.emit) rec.emit.rotation.y += dt * 2; }
+  for (const st of ROCKET.stages) if (st.ring.visible) st.ring.material.emissiveIntensity = 2 + Math.sin(time * 4);
+  SKY.clouds.rotation.y += dt * .004; SKY.ball.rotation.y += dt * .002;
+  if (chevron && chevron.visible) chevron.position.y += Math.sin(time * 4) * .0015;
+  if (screen === 'menu' && !cinematic) {
+    menuAng += dt * (reduceMotion ? .01 : .06);
+    const rp = ROCKET.root.position, R = 11;
+    const goal = new THREE.Vector3(rp.x + Math.sin(menuAng) * R, 3.4, rp.z + Math.cos(menuAng) * R);
+    camera.position.lerp(goal, Math.min(1, dt * 1.5)); controls.target.lerp(new THREE.Vector3(rp.x + 2, 2.2, rp.z + 1), Math.min(1, dt * 1.5)); camera.lookAt(controls.target);
+  } else if (controls.enabled && !cinematic) controls.update();
+  composer.render(dt);
+  requestAnimationFrame(loop);
+}
+
+/* ---------------- boot ---------------- */
+async function boot(data) {
+  await new Promise(r => setTimeout(r, 30));
+  buildMaterials(); buildSharedGeos();
+  SKY = buildSky(); buildTerrain(); ROCKET = buildRocket(); A = buildAstronaut(); scene.add(A.root);
+  A.root.traverse(o => { if (o.isMesh) { o.castShadow = o.material !== AM.glow; } });
+  resize();
+  $('loading').hidden = true;
+  if (data && data.n && unlocked(data.n)) { openLevel(data.n); if (data.program) { program = data.program; renderProgram(); } }
+  else showMenu();
+  camera.position.set(ROCKET_POS.x + 9, 4, ROCKET_POS.z + 9); controls.target.copy(ROCKET_POS);
+  loop();
+}
+window.claude?.hot?.snapshot?.(() => ({ n: screen === 'game' && level ? level.n : null, program }));
+const start = d => boot(d).catch(e => { $('loadMsg').textContent = t('bootFail') + e.message; $('loading').hidden = false; console.error(e); });
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+
+</body></html>

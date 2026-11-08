@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; connect-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="format-detection" content="telephone=no">
+<title>Магічні слова</title>
+<style>
+:root{--card:#FFF8E6;--ink:#2B1B5E;--muted:#6B5A9E;--gold:#FFC93C;--pink:#FF6B8B;--mint:#27C9A0;--ok:#138A4E;--bad:#D7263D;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--card:#2A2160;--ink:#FFF4D6;--muted:#C7BEF0;--ok:#5CE39A;--bad:#FF7A8A;color-scheme:dark}}
+:root[data-theme="dark"]{--card:#2A2160;--ink:#FFF4D6;--muted:#C7BEF0;--ok:#5CE39A;--bad:#FF7A8A;color-scheme:dark}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{font-family:"Trebuchet MS","Comic Sans MS","Segoe UI",system-ui,sans-serif;color:#fff;overflow:auto;
+ background:radial-gradient(2px 2px at 12% 22%,#fff,transparent),radial-gradient(2px 2px at 78% 12%,#fff,transparent),radial-gradient(3px 3px at 90% 60%,#FFE9A8,transparent),radial-gradient(2px 2px at 30% 80%,#fff,transparent),radial-gradient(2px 2px at 55% 40%,#FFE9A8,transparent),radial-gradient(2px 2px at 5% 65%,#fff,transparent),linear-gradient(#1A1364,#4B2A8A 60%,#8B4FB8);background-attachment:fixed}
+.scr{display:none;min-height:100%;padding:12px 16px 24px;max-width:1100px;margin:0 auto}.scr.on{display:block}
+h1{font-size:clamp(2rem,6vw,3.6rem);margin:6px 0;text-shadow:0 4px 0 #2B1B5E}
+.btn{font:inherit;font-weight:800;font-size:clamp(1.05rem,2.3vw,1.6rem);border:4px solid #2B1B5E;border-radius:20px;padding:12px 24px;min-height:58px;background:var(--pink);color:#fff;cursor:pointer;box-shadow:0 6px 0 #2B1B5E}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #2B1B5E}.btn.alt{background:#fff;color:#2B1B5E}.btn.go{background:var(--mint);color:#08311F}
+.btn.sel{outline:5px solid var(--gold)}
+.row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:14px 0}
+.center{text-align:center}
+.lvls{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:18px 0}
+.lv{background:var(--card);color:var(--ink);border:5px solid #2B1B5E;border-radius:28px;box-shadow:0 8px 0 #2B1B5E;padding:18px;text-align:center;cursor:pointer;font:inherit}
+.lv:hover{transform:translateY(-3px)}.lv b{display:block;font-size:1.5rem}.lv span{display:block;color:var(--muted);font-weight:700;margin-top:4px}.lv .em{font-size:3rem}.lv .st{color:#E8A400;font-size:1.5rem;letter-spacing:3px}
+p.hint{font-weight:700;opacity:.9;text-align:center}
+/* гра */
+.top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.pill{background:#fff;color:#2B1B5E;border:3px solid #2B1B5E;border-radius:999px;padding:4px 14px;font-weight:800;font-size:clamp(.95rem,2vw,1.3rem);white-space:nowrap}
+.sp{flex:1}.ib{width:52px;height:52px;border-radius:16px;border:3px solid #2B1B5E;background:var(--gold);font-size:1.5rem;cursor:pointer;box-shadow:0 4px 0 #2B1B5E}
+.scene{display:grid;grid-template-columns:minmax(120px,230px) 1fr;gap:12px;align-items:end}
+#wiz{width:100%;height:auto;max-height:46vh}
+.book{display:flex;background:var(--card);color:var(--ink);border:6px solid #8A4B1F;border-radius:20px 20px 30px 30px;box-shadow:0 10px 0 #5E3212;overflow:hidden;min-height:200px}
+.pg1{flex:0 0 28%;padding:16px;background:linear-gradient(90deg,#F4E3BC,#FFF1D0);border-right:6px double #C9A15A;text-align:center;font-weight:800}
+.pg1 .big{font-size:3rem}.pg1 small{display:block;color:var(--muted);margin-top:6px}
+.pg2{flex:1;padding:20px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+#spell{font-size:clamp(1.8rem,5.2vw,3.6rem);font-weight:800;line-height:1.35;word-break:break-word;letter-spacing:.04em}
+#spell span{display:inline-block;min-width:.32em;border-bottom:4px solid transparent;transition:color .12s}
+#spell .ok{color:var(--ok);text-shadow:0 0 12px rgba(80,230,150,.7);transform:translateY(-2px)}
+#spell .bad{color:#fff;background:var(--bad);border-radius:8px;animation:shk .3s}
+#spell .cur{border-bottom-color:var(--gold);animation:bl 1s infinite;background:rgba(255,201,60,.25);border-radius:6px}
+#spell .sp2{border-bottom:3px dotted var(--muted)}
+@keyframes shk{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}@keyframes bl{50%{background:rgba(255,201,60,.05)}}
+.book.cast{animation:glow 1s}@keyframes glow{30%{box-shadow:0 0 70px 24px rgba(255,230,120,.9),0 10px 0 #5E3212}}
+#inp{display:block;width:100%;margin:14px 0 6px;font:inherit;font-weight:800;font-size:clamp(1.4rem,3.5vw,2.4rem);text-align:center;padding:12px;border:5px solid #2B1B5E;border-radius:20px;background:#fff;color:#2B1B5E;outline:none}
+#inp:focus{box-shadow:0 0 0 6px var(--gold)}#inp.bad{border-color:var(--bad);box-shadow:0 0 0 6px rgba(215,38,61,.4)}#inp:disabled{background:#DFFFEA}
+#msg{min-height:2em;font-weight:800;font-size:clamp(1rem,2.2vw,1.4rem);text-align:center}
+.arm{transform-box:view-box;transform-origin:150px 165px}.wiz.cast .arm{animation:wave .9s}.wiz.cast #mouth{d:path("M82 122 Q100 142 118 122")}
+@keyframes wave{25%{transform:rotate(-35deg)}60%{transform:rotate(15deg)}}
+.fl{position:fixed;font-weight:800;font-size:clamp(2rem,6vw,4rem);color:#FFE066;text-shadow:0 4px 0 #2B1B5E,0 0 24px #fff;pointer-events:none;animation:up 1.4s forwards;z-index:30}
+@keyframes up{to{transform:translateY(-140px) scale(1.4);opacity:0}}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:25}
+.ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,10,50,.8);padding:16px;z-index:40;overflow:auto}.ov.on{display:flex}
+.card{background:var(--card);color:var(--ink);border:5px solid #2B1B5E;border-radius:32px;box-shadow:0 8px 0 #2B1B5E;padding:clamp(16px,3vw,32px);max-width:640px;width:100%;text-align:center}
+.card h2{margin:6px 0;font-size:clamp(1.6rem,4.5vw,2.6rem)}.card .st{font-size:2.4rem;color:#E8A400;letter-spacing:6px}.card .tro{font-size:6rem;line-height:1;animation:fl 2s ease-in-out infinite}
+@keyframes fl{50%{transform:translateY(-10px) rotate(6deg)}}
+.stat{font-size:clamp(1.1rem,2.6vw,1.6rem);font-weight:800;margin:6px 0}
+:focus-visible{outline:4px solid var(--gold);outline-offset:3px}
+@media (max-width:640px){.scene{grid-template-columns:1fr}#wiz{max-height:22vh}.pg1{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<section class="scr on" id="menu">
+  <div class="center">
+    <div style="font-size:4rem" aria-hidden="true">🧙‍♂️</div>
+    <h1>Магічні слова</h1>
+    <p class="hint">Ти — маленький чарівник. Щоб заклинання спрацювало, набери слово без помилок!</p>
+  </div>
+  <div class="row" role="group" aria-label="Режим">
+    <button class="btn alt sel" id="m1" type="button">🌱 Тренування (без таймера)</button>
+    <button class="btn alt" id="m2" type="button">⏱ Випробування (з таймером)</button>
+  </div>
+  <div class="lvls">
+    <button class="lv" data-l="1" type="button"><div class="em">🪄</div><b>Рівень 1</b><span>Слова з 3–4 літер</span><div class="st" id="s1">☆☆☆</div></button>
+    <button class="lv" data-l="2" type="button"><div class="em">📖</div><b>Рівень 2</b><span>Слова з 5–7 літер</span><div class="st" id="s2">☆☆☆</div></button>
+    <button class="lv" data-l="3" type="button"><div class="em">👑</div><b>Рівень 3</b><span>Короткі речення</span><div class="st" id="s3">☆☆☆</div></button>
+  </div>
+  <p class="hint">⌨️ Перемкни клавіатуру на українську розкладку. Клавіша Enter — наступне заклинання.</p>
+</section>
+
+<section class="scr" id="game">
+  <div class="top">
+    <button class="ib" id="bm" type="button" aria-label="Меню">🏠</button>
+    <div class="pill" id="pl">Рівень 1</div>
+    <div class="pill">📜 <span id="hn">1 / 10</span></div>
+    <div class="pill">✅ слів: <span id="hw">0</span></div>
+    <div class="pill">🎯 <span id="ha">100</span>%</div>
+    <div class="pill">⚡ <span id="hs">–</span> зн/хв</div>
+    <div class="pill" id="ht">⏱ 01:30</div>
+    <div class="sp"></div>
+    <button class="ib" id="bs" type="button" aria-label="Звук">🔊</button>
+    <button class="ib" id="bf" type="button" aria-label="На весь екран">⛶</button>
+  </div>
+  <div class="scene">
+    <svg id="wiz" class="wiz" viewBox="0 0 260 260" role="img" aria-label="Маленький чарівник із чарівною паличкою">
+      <path d="M55 150 L145 150 L170 252 L30 252Z" fill="#6D4AE0" stroke="#2B1B5E" stroke-width="5" stroke-linejoin="round"/>
+      <text x="62" y="205" font-size="22" fill="#FFD84D">★</text><text x="110" y="232" font-size="18" fill="#FFD84D">★</text><text x="90" y="180" font-size="14" fill="#FFD84D">★</text>
+      <path d="M70 128 Q100 190 130 128 Q100 150 70 128Z" fill="#fff" stroke="#2B1B5E" stroke-width="4" stroke-linejoin="round"/>
+      <circle cx="100" cy="108" r="38" fill="#FFD7B0" stroke="#2B1B5E" stroke-width="5"/>
+      <circle cx="86" cy="104" r="6" fill="#2B1B5E"/><circle cx="114" cy="104" r="6" fill="#2B1B5E"/><circle cx="88" cy="102" r="2" fill="#fff"/><circle cx="116" cy="102" r="2" fill="#fff"/>
+      <circle cx="78" cy="118" r="6" fill="#FF9FB3" opacity=".7"/><circle cx="122" cy="118" r="6" fill="#FF9FB3" opacity=".7"/>
+      <path id="mouth" d="M88 122 Q100 132 112 122" fill="none" stroke="#2B1B5E" stroke-width="4" stroke-linecap="round"/>
+      <path d="M52 86 L100 4 L148 86Z" fill="#8B5CF6" stroke="#2B1B5E" stroke-width="5" stroke-linejoin="round"/>
+      <ellipse cx="100" cy="86" rx="58" ry="12" fill="#6D4AE0" stroke="#2B1B5E" stroke-width="5"/>
+      <text x="88" y="64" font-size="24" fill="#FFD84D">★</text>
+      <g class="arm"><path d="M150 165 L196 135" stroke="#6D4AE0" stroke-width="16" stroke-linecap="round"/><circle cx="198" cy="133" r="9" fill="#FFD7B0" stroke="#2B1B5E" stroke-width="3"/>
+        <line x1="198" y1="133" x2="240" y2="70" stroke="#8A4B1F" stroke-width="7" stroke-linecap="round"/><circle id="tip" cx="242" cy="66" r="9" fill="#FFE066" stroke="#2B1B5E" stroke-width="3"/></g>
+    </svg>
+    <div>
+      <div class="book" id="book">
+        <div class="pg1"><div class="big">📜</div>Заклинання<br><span id="no">№ 1</span><small id="lvn"></small></div>
+        <div class="pg2"><div id="spell" aria-live="polite"></div></div>
+      </div>
+      <input id="inp" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Набери заклинання">
+      <div id="msg"></div>
+      <div class="row"><button class="btn go" id="nx" type="button">✨ Наступне заклинання</button></div>
+    </div>
+  </div>
+</section>
+
+<div class="ov" id="res"><div class="card">
+  <div class="tro" id="rt">🏆</div><h2 id="rh">Рівень пройдено!</h2><div class="st" id="rs">★★★</div>
+  <div class="stat" id="r1"></div><div class="stat" id="r2"></div><div class="stat" id="r3"></div>
+  <div class="row"><button class="btn" id="ra" type="button">🔄 Ще раз</button><button class="btn go" id="rn" type="button">➡️ Наступний рівень</button><button class="btn alt" id="rm" type="button">🏠 Меню</button></div>
+</div></div>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var POOL={
+ 1:"кіт дім сад мак лис сон ліс мед сир рак хліб рука нога вовк миша ніч день сніг вода хата сова дощ гриб жаба зуб ніс кіт мир".split(" "),
+ 2:"зірка місяць казка вогонь дракон замок школа книга мишка екран принтер курсор пароль монітор клавіша папка ракета планета комета магія кнопка вікно".split(" "),
+ 3:["Кіт спить на дивані.","Сонце світить яскраво.","Я люблю читати казки.","Чарівник махнув паличкою.","Зірки сяють уночі.","Дракон охороняє замок.","Мишка біжить по килимку.","Мама читає цікаву книгу.","Ми вивчаємо інформатику.","Взимку падає білий сніг.","Паличка дарує чудеса.","Я набираю текст без помилок.","Вчитель показує новий урок.","Ліс шумить уранці.","Тато купив новий монітор."]};
+var TIME={1:90,2:120,3:150},NAMES={1:"Паличка новачка",2:"Книга чарівника",3:"Корона великого мага"},ICON={1:"🪄",2:"📖",3:"👑"},CHEER=["Ура! Заклинання вдалося!","Чудово! Магія працює!","Блискуче! Ти справжній чарівник!","Абракадабра! Вийшло!","Дивовижно! Без жодної помилки!"];
+var lvl=1,mode="train",list=[],idx=0,target="",prev=0,tot=0,okk=0,done=0,chars=0,act=0,t0=0,lv0=0,locked=false,sound=true,AC=null,timer=null,best={};
+try{best=JSON.parse(localStorage.getItem("ml-best")||"{}")}catch(e){}
+function stars(n){return"★★★".slice(0,n)+"☆☆☆".slice(0,3-n)}
+function menuStars(){[1,2,3].forEach(function(l){$("s"+l).textContent=stars(best[l]||0)})}
+function show(id){["menu","game"].forEach(function(k){$(k).classList.toggle("on",k==id)});$("res").classList.remove("on")}
+
+/* звук */
+function beep(f,d,ty,v,dl){if(!sound||!AC)return;var o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+(dl||0);o.type=ty||"sine";o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v||.1,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d+.03)}
+function snd(k){if(k=="k")beep(880+Math.random()*200,.05,"sine",.05);else if(k=="e")beep(160,.18,"sawtooth",.08);
+ else if(k=="w")[523,659,784,1047,1319].forEach(function(f,i){beep(f,.22,"triangle",.12,i*.07)});
+ else if(k=="f")[523,659,784,1047,784,1047,1319].forEach(function(f,i){beep(f,.25,"square",.06,i*.12)})}
+
+/* ефекти */
+var cv=$("fx"),x=cv.getContext("2d"),P=[],raf=0;
+function fit(){cv.width=innerWidth;cv.height=innerHeight}
+function burst(ax,ay){var E=["✨","⭐","💫","🌟","✦"];for(var i=0;i<46;i++){var a=Math.random()*6.28,s=120+Math.random()*420;P.push({x:ax,y:ay,vx:Math.cos(a)*s,vy:Math.sin(a)*s-120,l:1.2+Math.random()*.6,e:E[i%5],z:16+Math.random()*22})}
+ P.push({ring:1,x:ax,y:ay,r:10,l:.8});if(!raf)raf=requestAnimationFrame(loop)}
+var lt=0;
+function loop(ts){var dt=Math.min(.05,(ts-lt)/1000||.016);lt=ts;x.clearRect(0,0,cv.width,cv.height);
+ for(var i=P.length-1;i>=0;i--){var p=P[i];p.l-=dt;if(p.l<=0){P.splice(i,1);continue}
+  if(p.ring){p.r+=dt*700;x.globalAlpha=p.l;x.strokeStyle="#FFE066";x.lineWidth=8;x.beginPath();x.arc(p.x,p.y,p.r,0,7);x.stroke();continue}
+  p.vy+=500*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;x.globalAlpha=Math.min(1,p.l);x.font=p.z+"px serif";x.fillText(p.e,p.x,p.y)}
+ x.globalAlpha=1;raf=P.length?requestAnimationFrame(loop):0}
+function cast(){var r=$("tip").getBoundingClientRect();burst(r.left+r.width/2,r.top+r.height/2);
+ var w=$("wiz"),b=$("book");w.classList.remove("cast");b.classList.remove("cast");void w.offsetWidth;w.classList.add("cast");b.classList.add("cast");
+ var f=document.createElement("div");f.className="fl";f.textContent=target.length>14?"✨ Магія! ✨":"✨ "+target+" ✨";var br=b.getBoundingClientRect();f.style.left=(br.left+br.width*.15)+"px";f.style.top=(br.top+br.height*.3)+"px";document.body.appendChild(f);setTimeout(function(){f.remove()},1500);snd("w")}
+
+/* гра */
+function pick(l){var a=POOL[l].slice(),r=[];a=a.filter(function(v,i,s){return s.indexOf(v)==i});while(r.length<10&&a.length)r.push(a.splice(Math.floor(Math.random()*a.length),1)[0]);return r}
+function startLevel(l){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.resume)AC.resume()}catch(e){}
+ lvl=l;list=pick(l);idx=0;tot=0;okk=0;done=0;chars=0;act=0;t0=0;lv0=Date.now();
+ $("pl").textContent="Рівень "+l+" · "+(mode=="train"?"🌱 тренування":"⏱ випробування");$("lvn").textContent=["","слова з 3–4 літер","слова з 5–7 літер","речення"][l];
+ clearInterval(timer);if(mode=="test"){timer=setInterval(tick,250)}
+ show("game");spell();hud()}
+function spell(){target=list[idx];prev=0;t0=0;locked=false;var i=$("inp");i.value="";i.disabled=false;i.maxLength=target.length;i.classList.remove("bad");
+ $("no").textContent="№ "+(idx+1);$("nx").textContent=idx>=list.length-1?"🏆 Завершити рівень":"✨ Наступне заклинання";$("nx").classList.add("alt");$("nx").classList.remove("go");
+ render("");$("msg").textContent="Набери заклинання з книги ⬆️";hud();setTimeout(function(){i.focus()},30)}
+function render(v){var h="";for(var i=0;i<target.length;i++){var c=target[i],k=i<v.length?(v[i]===c?"ok":"bad"):i==v.length?"cur":"";if(c==" ")k+=" sp2";h+='<span class="'+k+'">'+(c==" "?"&nbsp;":c)+"</span>"}$("spell").innerHTML=h}
+function speed(){var ms=act+(t0?Date.now()-t0:0),pre=0;if(t0&&!locked){var v=$("inp").value;for(var i=0;i<v.length&&v[i]===target[i];i++)pre++}var ch=chars+pre;return ms>2000?Math.round(ch/(ms/60000)):0}
+function acc(){return tot?Math.round(okk/tot*100):100}
+function fmt(s){s=Math.max(0,Math.ceil(s));return("0"+(s/60|0)).slice(-2)+":"+("0"+s%60).slice(-2)}
+function hud(){$("hn").textContent=(idx+1)+" / "+list.length;$("hw").textContent=done;$("ha").textContent=acc();var s=speed();$("hs").textContent=s||"–";
+ $("ht").textContent=mode=="train"?"∞ без таймера":"⏱ "+fmt(TIME[lvl]-(Date.now()-lv0)/1000)}
+function tick(){if(TIME[lvl]-(Date.now()-lv0)/1000<=0){finish(true)}else hud()}
+function onInput(){if(locked)return;var i=$("inp"),v=i.value;if(!t0&&v.length)t0=Date.now();
+ if(v.length>prev){for(var j=prev;j<v.length;j++){tot++;if(v[j]===target[j]){okk++;snd("k")}else snd("e")}}prev=v.length;
+ var bad=v!==target.slice(0,v.length);i.classList.toggle("bad",bad);render(v);
+ $("msg").textContent=bad?"Ой! Помилку підсвічено червоним. Стирай Backspace і виправ ✏️":"Так тримати! 👍";
+ if(v===target)success();hud()}
+function success(){locked=true;done++;chars+=target.length;act+=Date.now()-t0;t0=0;$("inp").disabled=true;$("msg").textContent=CHEER[Math.floor(Math.random()*CHEER.length)];
+ $("nx").classList.remove("alt");$("nx").classList.add("go");cast();hud()}
+function next(){if(!locked){t0=0}if(idx>=list.length-1)return finish(false);idx++;spell()}
+function finish(timeout){clearInterval(timer);timer=null;var a=acc(),s=speed(),el=Math.round((Date.now()-lv0)/1000);
+ var n=done<7?0:a>=95?3:a>=85?2:1;if(timeout&&done<list.length)n=Math.min(n,done>=7?1:0);
+ if(n>(best[lvl]||0)){best[lvl]=n;try{localStorage.setItem("ml-best",JSON.stringify(best))}catch(e){}}
+ $("rt").textContent=n?ICON[lvl]:"🌟";$("rh").textContent=n?"Нагорода: "+NAMES[lvl]+"!":timeout?"Час вийшов ⏳":"Гарна спроба!";
+ $("rs").textContent=stars(n);$("r1").textContent="✅ Заклинань: "+done+" з "+list.length+" · 🎯 Точність: "+a+"%";
+ $("r2").textContent="⚡ Швидкість: "+(s||"–")+" знаків на хвилину";$("r3").textContent="⏱ Час: "+fmt(el)+(n?"":" · потрібно хоча б 7 заклинань");
+ $("rn").style.display=lvl<3&&n?"":"none";snd(n?"f":"e");if(n)burst(innerWidth/2,innerHeight/3);$("res").classList.add("on");menuStars()}
+
+/* події */
+$("inp").addEventListener("input",onInput);
+$("inp").addEventListener("paste",function(e){e.preventDefault()});$("inp").addEventListener("drop",function(e){e.preventDefault()});
+document.querySelector(".pg2").addEventListener("click",function(){var i=$("inp");if(!i.disabled)i.focus()});
+document.addEventListener("keydown",function(e){if(e.key=="Enter"&&$("game").classList.contains("on")&&!$("res").classList.contains("on")){e.preventDefault();if(locked)next()}});
+$("nx").onclick=next;
+$("bm").onclick=function(){clearInterval(timer);show("menu")};$("rm").onclick=function(){clearInterval(timer);show("menu")};
+$("ra").onclick=function(){$("res").classList.remove("on");startLevel(lvl)};$("rn").onclick=function(){$("res").classList.remove("on");startLevel(lvl+1)};
+$("m1").onclick=function(){mode="train";$("m1").classList.add("sel");$("m2").classList.remove("sel")};
+$("m2").onclick=function(){mode="test";$("m2").classList.add("sel");$("m1").classList.remove("sel")};
+[].forEach.call(document.querySelectorAll(".lv"),function(b){b.onclick=function(){startLevel(+b.dataset.l)}});
+$("bs").onclick=function(){sound=!sound;$("bs").textContent=sound?"🔊":"🔇"};
+$("bf").onclick=function(){var d=document;if(d.fullscreenElement)d.exitFullscreen();else if(d.documentElement.requestFullscreen){var p=d.documentElement.requestFullscreen();if(p&&p.catch)p.catch(function(){})}};
+setInterval(function(){if($("game").classList.contains("on")&&mode=="train"&&!locked&&t0)hud()},500);
+window.addEventListener("resize",fit);fit();menuStars();
+})();
+</script>
+</body>
+</html>
